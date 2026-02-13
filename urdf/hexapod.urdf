@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+<robot name="hexapod_bot">
+
+  <material name="red">
+    <color rgba="0.8 0 0 1"/>
+  </material>
+  <material name="black">
+    <color rgba="0.1 0.1 0.1 1"/>
+  </material>
+  <material name="silver">
+    <color rgba="0.75 0.75 0.75 1"/>
+  </material>
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="0.20 0.12 0.06"/> </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+
+
+  <joint name="joint_1_coxa" type="revolute">
+    <parent link="base_link"/>
+    <child link="leg_1_coxa"/>
+    <origin xyz="0.1 0.06 0" rpy="0 0 -3.1415"/> <axis xyz="0 0 -1"/> <limit lower="0" upper="3.1415" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_1_coxa">
+    <visual>
+      <geometry>
+        <cylinder length="0.047" radius="0.02"/> </geometry>
+      <origin xyz="0.0235 0 0" rpy="0 1.5708 0"/> <material name="red"/>
+    </visual>
+  </link>
+
+
+  <joint name="joint_1_femur" type="revolute">
+    <parent link="leg_1_coxa"/>
+    <child link="leg_1_femur"/>
+    <origin xyz="0.047 0 0" rpy="0 -1.309 0"/> <axis xyz="0 1 0"/> <limit lower="0" upper="3.1415" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_1_femur">
+    <visual>
+      <geometry>
+        <box size="0.11 0.04 0.04"/> </geometry>
+      <origin xyz="0.055 0 0" rpy="0 0 0"/> <material name="silver"/>
+    </visual>
+  </link>
+
+
+  <joint name="joint_1_tibia" type="revolute">
+    <parent link="leg_1_femur"/>
+    <child link="leg_1_tibia"/>
+    <origin xyz="0.11 0 0" rpy="0 -0.17 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="0" upper="3.1415" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_1_tibia">
+    <visual>
+      <geometry>
+        <cylinder length="0.196" radius="0.01"/> </geometry>
+      <origin xyz="0.098 0 0" rpy="0 1.5708 0"/>
+      <material name="black"/>
+    </visual>
+  </link>
+
+
+
+</robot>

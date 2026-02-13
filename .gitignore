@@ -1,0 +1,12 @@
+# Python ideiglenes fájlok
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ROS 2 generált fájlok (biztonságból, bár itt nem kéne lenniük)
+build/
+install/
+log/
+
+# IDE beállítások (ha VS Code-ot használsz)
+.vscode/
