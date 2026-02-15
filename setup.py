@@ -17,6 +17,7 @@ setup(
         (os.path.join('share', package_name, 'meshes'), glob('meshes/*.stl')),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'urdf'), glob('urdf/*.urdf')),
+        (os.path.join('share', package_name, 'config'), glob('config/*.json')),
         ### EDDIG ###
     ],
     install_requires=['setuptools'],
@@ -31,8 +32,12 @@ setup(
         ],
     },
     entry_points={
-        'console_scripts': [
-            'ik_node = my_hexapod.ik_node:main'
+        'console_scripts': [          
+            # A Fő agy (Régi ik_node helyett)
+            'robot_node = my_hexapod.nodes.robot_node:main',
+            
+            # A hardveres interfész (Ha majd kész lesz a kód benne)
+            'servo_node = my_hexapod.nodes.servo_node:main',
         ],
     },
 )

@@ -32,12 +32,20 @@ def generate_launch_description():
         #     output='screen'
         # ),
         
+        # Node(
+        #     package='my_hexapod',
+        #     executable='ik_node_backup',
+        #     name='  ik_node_backup',
+        #     output='screen'
+        # ),
+        
         Node(
             package='my_hexapod',
-            executable='ik_node',
-            name='ik_node',
+            executable='robot_node',
+            name='robot_node',
             output='screen'
         ),
+        
         # 3. A Foxglove híd
         Node(
             package='foxglove_bridge',

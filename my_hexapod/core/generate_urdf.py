@@ -1,12 +1,12 @@
 import json, math, os
 
 def generate_urdf():
-    # 1. Beolvassuk a konfigot
-    # Megkeressük, hol van EZ a python fájl a lemezen és hozzáfűzzük a robot_config.json elérési útját
+    # 1. Beolvassuk a konfigot    
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    config_path = os.path.join(script_dir, 'robot_config.json')
+    CONFIG_PATH = os.path.join(script_dir, '..', 'config', 'robot_dimension.json')
+    URDF_PATH = "./urdf/hexapod.urdf"
     
-    with open(config_path, 'r') as f:
+    with open(CONFIG_PATH, 'r') as f:
         config = json.load(f)
 
     dims = config['dimensions']
@@ -101,7 +101,7 @@ def generate_urdf():
     urdf += "</robot>"
 
     # Kiírás fájlba
-    with open("./urdf/hexapod.urdf", 'w') as f:
+    with open(URDF_PATH, 'w') as f:
         f.write(urdf)
     
     print("Siker! A hexapod.urdf legenerálva 6 lábbal.")
