@@ -32,6 +32,7 @@ def generate_launch_description():
         #     output='screen'
         # ),
         
+        #Backup ik_node ha kellene még tesztelni
         # Node(
         #     package='my_hexapod',
         #     executable='ik_node_backup',
@@ -45,6 +46,12 @@ def generate_launch_description():
             name='robot_node',
             output='screen'
         ),
+        # Node(
+        #     package='servo_node',
+        #     executable='servo_node',
+        #     name='servo_node',
+        #     output='screen'
+        # ),
         
         # 3. A Foxglove híd
         Node(
