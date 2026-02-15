@@ -1,18 +1,29 @@
 {
-    "controllers": {
-        "pca9685": {
-            "frequency": 50
-        }
-    },
+    "i2c_address": 64,
+    "frequency": 50,
     "servos": {
-        "joint_1_coxa": {
-            "pin": 0,              "center": 1500, "direction": 1, "range_deg": 180, "pwm_min": 500, "pwm_max": 2500
-        },
-        "joint_1_femur": {
-            "pin": 1,              "center": 1500, "direction": -1, "range_deg": 180, "pwm_min": 500, "pwm_max": 2500
-        },
-        "joint_1_tibia": {
-            "pin": 2,              "center": 1500, "direction": 1, "range_deg": 180, "pwm_min": 500, "pwm_max": 2500
-        }
+        "joint_1_coxa":  { "pin": 0, "center": 180, "offset": 0,   "dir": -1 },
+        "joint_1_femur": { "pin": 1, "center": 180, "offset": -20, "dir": -1 },
+        "joint_1_tibia": { "pin": 2, "center": 180, "offset": 0,   "dir": -1 },
+
+        "joint_2_coxa":  { "pin": 3, "center": 180, "offset": 0,   "dir": -1 },
+        "joint_2_femur": { "pin": 4, "center": 180, "offset": -20, "dir": -1 },
+        "joint_2_tibia": { "pin": 5, "center": 180, "offset": 0,   "dir": -1 },
+
+        "joint_3_coxa":  { "pin": 6, "center": 180, "offset": 0,   "dir": -1 },
+        "joint_3_femur": { "pin": 7, "center": 180, "offset": -20, "dir": -1 },
+        "joint_3_tibia": { "pin": 8, "center": 180, "offset": 0,   "dir": -1 },
+
+        "joint_4_coxa":  { "pin": 9, "center": 0, "offset": 0,   "dir": 1 },
+        "joint_4_femur": { "pin": 10,"center": 0, "offset": 20,  "dir": 1 },
+        "joint_4_tibia": { "pin": 11,"center": 0, "offset": 0,   "dir": 1 },
+
+        "joint_5_coxa":  { "pin": 12, "center": 0, "offset": 0,   "dir": 1 },
+        "joint_5_femur": { "pin": 13, "center": 0, "offset": 20,  "dir": 1 },
+        "joint_5_tibia": { "pin": 14, "center": 0, "offset": 0,   "dir": 1 },
+
+        "joint_6_coxa":  { "pin": 15, "center": 0, "offset": 0,   "dir": 1 },
+        "joint_6_femur": { "pin": 15, "center": 0, "offset": 20,  "dir": 1 }, 
+        "joint_6_tibia": { "pin": 15, "center": 0, "offset": 0,   "dir": 1 }
     }
 }

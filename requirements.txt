@@ -1,0 +1,8 @@
+# Hardver kommunikáció (Raspberry Pi GPIO és I2C)
+Adafruit-Blinka
+adafruit-circuitpython-pca9685
+adafruit-circuitpython-motor
+adafruit-circuitpython-servokit
+
+# Matek (ha a numpy-t használod a test fájlban)
+numpy

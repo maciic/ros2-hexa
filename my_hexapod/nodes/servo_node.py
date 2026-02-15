@@ -4,70 +4,127 @@ from sensor_msgs.msg import JointState
 import json
 import os
 import math
+import time
 
-class ServoInterface(Node):
+# Hardveres importok (a test4.py alapján)
+try:
+    from board import SCL, SDA
+    import busio
+    from adafruit_pca9685 import PCA9685
+    from adafruit_motor import servo
+    HARDWARE_AVAILABLE = True
+except ImportError:
+    HARDWARE_AVAILABLE = False
+
+class ServoNode(Node):
     def __init__(self):
-        super().__init__('servo_interface')
+        super().__init__('hexapod_hardware')
         
-        # Konfig betöltése
+        # 1. KONFIG BETÖLTÉSE
         script_dir = os.path.dirname(os.path.realpath(__file__))
-        with open(os.path.join(script_dir, 'servo_config.json'), 'r') as f:
+        config_path = os.path.join(script_dir, '..', 'config', 'servo_map.json')
+        
+        with open(config_path, 'r') as f:
             self.config = json.load(f)
             
-        self.servos = self.config['servos']
+        self.servo_map = self.config['servos']
+        self.servos = {} # Itt tároljuk a szervó objektumokat
+
+        # 2. HARDVER INICIALIZÁLÁS (test4.py alapján)
+        if HARDWARE_AVAILABLE:
+            try:
+                self.i2c = busio.I2C(SCL, SDA)
+                self.pca = PCA9685(self.i2c)
+                self.pca.frequency = self.config.get('frequency', 50)
+                
+                # Szervó objektumok létrehozása a map alapján
+                for name, cfg in self.servo_map.items():
+                    pin = cfg['pin']
+                    # Csak akkor hozzuk létre, ha még nincs és létező csatorna (0-15)
+                    if pin < 16: 
+                        # Létrehozzuk az adafruit_motor szervó objektumot
+                        self.servos[name] = servo.Servo(self.pca.channels[pin])
+                        # Opcionális: Min/Max pulse width beállítás, ha kell
+                        # self.servos[name].set_pulse_width_range(min_pulse=500, max_pulse=2500)
+                
+                self.get_logger().info(f"PCA9685 Inicializálva ({len(self.servos)} szervóval) 🔌")
+                
+            except Exception as e:
+                self.get_logger().error(f"HARDVER HIBA: {e}")
+                HARDWARE_AVAILABLE = False
         
-        # Feliratkozás a Matek Node-ra
+        if not HARDWARE_AVAILABLE:
+            self.get_logger().warn("⚠️ Nincs I2C hardver (DUMMY MÓD) - Csak szimuláció")
+
+        # 3. ROS FELIRATKOZÁS
         self.subscription = self.create_subscription(
             JointState,
             'joint_states',
             self.listener_callback,
             10
         )
-        
-        self.get_logger().info("Servo Interface Indul... Várakozás parancsokra.")
 
-    def rad_to_pwm(self, angle_rad, servo_cfg):
-        """ A nagy varázslat: Radián -> PWM konverzió """
-        
-        # 1. Radián -> Fok
+    def rad_to_degree_mapped(self, angle_rad, cfg):
+        """
+        Átszámolja a ROS radiánt a test4.py szerinti fokokra.
+        Logika: SzervóSzög = Center + (Fok + Offset) * Irány
+        Példa a test4.py alapján: 180 - (fok + 20)
+        Itt: Center=180, Irány=-1, Offset=20
+        """
         deg = math.degrees(angle_rad)
         
-        # 2. Irány korrekció (ha fordítva van felszerelve a motor)
-        deg = deg * servo_cfg['direction']
+        # 1. Hozzáadjuk a fizikai offsetet (pl. a Femur +20 foka)
+        deg_offset = deg + cfg['offset']
         
-        # 3. PWM számítás
-        # Egy átlagos szervó 1 fokra kb. 11.1 mikroszekundumot mozdul ((2500-500)/180)
-        # De pontosabb, ha a tartományból számoljuk:
-        pwm_per_deg = (servo_cfg['pwm_max'] - servo_cfg['pwm_min']) / servo_cfg['range_deg']
+        # 2. Irány és Center alkalmazása
+        # Ha dir = -1, akkor: center - deg_offset
+        # Ha dir =  1, akkor: center + deg_offset
+        final_angle = cfg['center'] + (deg_offset * cfg['dir'])
         
-        # Az eltolás a középálláshoz (center) képest
-        pwm_offset = deg * pwm_per_deg
-        
-        target_pwm = int(servo_cfg['center'] + pwm_offset)
-        
-        # 4. Biztonsági vágás (Limit)
-        return max(min(target_pwm, servo_cfg['pwm_max']), servo_cfg['pwm_min'])
+        return max(0.0, min(180.0, final_angle))
 
     def listener_callback(self, msg):
-        # Végigmegyünk a kapott neveken (pl. joint_1_coxa)
+        # msg.name: ['joint_1_coxa', ...]
+        # msg.position: [0.5, ...] (radiánban)
+        
         for i, name in enumerate(msg.name):
-            if name in self.servos:
-                # Megkeressük a hozzá tartozó szöget
-                angle = msg.position[i]
+            if name in self.servos and HARDWARE_AVAILABLE:
+                angle_rad = msg.position[i]
+                cfg = self.servo_map[name]
                 
-                # Átszámoljuk PWM-re
-                pwm = self.rad_to_pwm(angle, self.servos[name])
+                # Konverzió
+                target_angle = self.rad_to_degree_mapped(angle_rad, cfg)
                 
-                # ITT KÜLDENÉNK A HARDVERNEK (Majd ide írjuk a PCA9685 kódot)
-                # Teszthez csak kiírjuk:
-                # self.get_logger().info(f"{name}: {angle:.2f} rad -> {pwm} us")
+                # Küldés a motornak
+                try:
+                    self.servos[name].angle = target_angle
+                except ValueError:
+                    # Ha a szög kívül esik a tartományon, a library hibát dobhat
+                    pass
+            elif name in self.servo_map and not HARDWARE_AVAILABLE:
+                # Dummy log csak az 1-es lábra, hogy ne floodoljon
+                if "joint_1" in name:
+                     cfg = self.servo_map[name]
+                     deg = self.rad_to_degree_mapped(msg.position[i], cfg)
+                     # self.get_logger().info(f"{name}: {deg:.1f}°")
+
+    def __del__(self):
+        # Destruktor: Ha leállítjuk a node-ot, engedje el a motorokat
+        if HARDWARE_AVAILABLE and hasattr(self, 'pca'):
+            self.get_logger().info("Szervók elengedése...")
+            self.pca.deinit()
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ServoInterface()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    node = ServoNode()
+    
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
