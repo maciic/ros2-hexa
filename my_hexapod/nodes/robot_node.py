@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist 
 import json
 import time
 import math
