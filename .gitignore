@@ -10,3 +10,6 @@ log/
 
 # IDE beállítások (ha VS Code-ot használsz)
 .vscode/
+
+# Windows fájlok
+*:Zone.Identifier

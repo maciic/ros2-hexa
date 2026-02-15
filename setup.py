@@ -14,6 +14,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
 
         ### Én adtam hozzá
+        (os.path.join('share', package_name, 'meshes'), glob('meshes/*.stl')),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'urdf'), glob('urdf/*.urdf')),
         ### EDDIG ###
