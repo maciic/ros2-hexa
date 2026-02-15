@@ -1,73 +1,285 @@
 <?xml version="1.0"?>
 <robot name="hexapod_bot">
 
-  <material name="red">
-    <color rgba="0.8 0 0 1"/>
-  </material>
-  <material name="black">
-    <color rgba="0.1 0.1 0.1 1"/>
-  </material>
-  <material name="silver">
-    <color rgba="0.75 0.75 0.75 1"/>
-  </material>
+  <material name="red"><color rgba="0.8 0 0 1"/></material>
+  <material name="black"><color rgba="0.1 0.1 0.1 1"/></material>
+  <material name="silver"><color rgba="0.75 0.75 0.75 1"/></material>
 
   <link name="base_link">
     <visual>
-      <geometry>
-        <mesh filename="package://my_hexapod/meshes/base.stl" />
-      </geometry>
+      <geometry><mesh filename="package://my_hexapod/meshes/base.stl" /></geometry>
       <material name="black"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
     </visual>
   </link>
-
 
   <joint name="joint_1_coxa" type="revolute">
     <parent link="base_link"/>
     <child link="leg_1_coxa"/>
-    <origin xyz="0.0845 0.0668 0" rpy="0 0 0.668"/> <axis xyz="0 0 1"/> <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
+    <origin xyz="0.0852 -0.06720000000000001 0" rpy="0 0 -0.668"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
   </joint>
 
   <link name="leg_1_coxa">
     <visual>
-      <geometry>
-        <mesh filename="package://my_hexapod/meshes/coxa.stl"/>
-      </geometry>
+      <geometry><mesh filename="package://my_hexapod/meshes/coxa.stl"/></geometry>
       <origin xyz="0 0 0" rpy="0 0 0"/> <material name="red"/>
     </visual>
   </link>
 
-
   <joint name="joint_1_femur" type="revolute">
     <parent link="leg_1_coxa"/>
     <child link="leg_1_femur"/>
-    <origin xyz="0.0464 0 0.015" rpy="0 0 0"/> <axis xyz="0 1 0"/> <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
+    <origin xyz="0.0464 0 0.015" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
   </joint>
 
   <link name="leg_1_femur">
     <visual>
-      <geometry>
-        <mesh filename="package://my_hexapod/meshes/femur.stl"/>
-      </geometry>
+      <geometry><mesh filename="package://my_hexapod/meshes/femur.stl"/></geometry>
       <origin xyz="0 0 0" rpy="0 0 0"/> <material name="silver"/>
     </visual>
   </link>
 
-
   <joint name="joint_1_tibia" type="revolute">
     <parent link="leg_1_femur"/>
     <child link="leg_1_tibia"/>
-    <origin xyz="0.11 0 0" rpy="0 0 0"/> <axis xyz="0 1 0"/> <limit lower="-3.14" upper="3.14" effort="1000" velocity="1.0"/>
+    <origin xyz="0.11 0 -0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.14" upper="3.14" effort="1000" velocity="1.0"/>
   </joint>
 
   <link name="leg_1_tibia">
     <visual>
-      <geometry>
-        <mesh filename="package://my_hexapod/meshes/tibia.stl"/>
-      </geometry>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <material name="black"/>
+      <geometry><mesh filename="package://my_hexapod/meshes/tibia.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="black"/>
     </visual>
   </link>
 
+  <joint name="joint_2_coxa" type="revolute">
+    <parent link="base_link"/>
+    <child link="leg_2_coxa"/>
+    <origin xyz="0.0 -0.09259999999999999 0" rpy="0 0 -1.5708"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_2_coxa">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/coxa.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="red"/>
+    </visual>
+  </link>
+
+  <joint name="joint_2_femur" type="revolute">
+    <parent link="leg_2_coxa"/>
+    <child link="leg_2_femur"/>
+    <origin xyz="0.0464 0 0.015" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_2_femur">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/femur.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="silver"/>
+    </visual>
+  </link>
+
+  <joint name="joint_2_tibia" type="revolute">
+    <parent link="leg_2_femur"/>
+    <child link="leg_2_tibia"/>
+    <origin xyz="0.11 0 -0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.14" upper="3.14" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_2_tibia">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/tibia.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="black"/>
+    </visual>
+  </link>
+
+  <joint name="joint_3_coxa" type="revolute">
+    <parent link="base_link"/>
+    <child link="leg_3_coxa"/>
+    <origin xyz="-0.0852 -0.06720000000000001 0" rpy="0 0 -2.4735"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_3_coxa">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/coxa.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="red"/>
+    </visual>
+  </link>
+
+  <joint name="joint_3_femur" type="revolute">
+    <parent link="leg_3_coxa"/>
+    <child link="leg_3_femur"/>
+    <origin xyz="0.0464 0 0.015" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_3_femur">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/femur.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="silver"/>
+    </visual>
+  </link>
+
+  <joint name="joint_3_tibia" type="revolute">
+    <parent link="leg_3_femur"/>
+    <child link="leg_3_tibia"/>
+    <origin xyz="0.11 0 -0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.14" upper="3.14" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_3_tibia">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/tibia.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="black"/>
+    </visual>
+  </link>
+
+  <joint name="joint_4_coxa" type="revolute">
+    <parent link="base_link"/>
+    <child link="leg_4_coxa"/>
+    <origin xyz="-0.0852 0.06720000000000001 0" rpy="0 0 2.4735"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_4_coxa">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/coxa.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="red"/>
+    </visual>
+  </link>
+
+  <joint name="joint_4_femur" type="revolute">
+    <parent link="leg_4_coxa"/>
+    <child link="leg_4_femur"/>
+    <origin xyz="0.0464 0 0.015" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_4_femur">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/femur.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="silver"/>
+    </visual>
+  </link>
+
+  <joint name="joint_4_tibia" type="revolute">
+    <parent link="leg_4_femur"/>
+    <child link="leg_4_tibia"/>
+    <origin xyz="0.11 0 -0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.14" upper="3.14" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_4_tibia">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/tibia.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="black"/>
+    </visual>
+  </link>
+
+  <joint name="joint_5_coxa" type="revolute">
+    <parent link="base_link"/>
+    <child link="leg_5_coxa"/>
+    <origin xyz="0.0 0.09259999999999999 0" rpy="0 0 1.5708"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_5_coxa">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/coxa.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="red"/>
+    </visual>
+  </link>
+
+  <joint name="joint_5_femur" type="revolute">
+    <parent link="leg_5_coxa"/>
+    <child link="leg_5_femur"/>
+    <origin xyz="0.0464 0 0.015" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_5_femur">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/femur.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="silver"/>
+    </visual>
+  </link>
+
+  <joint name="joint_5_tibia" type="revolute">
+    <parent link="leg_5_femur"/>
+    <child link="leg_5_tibia"/>
+    <origin xyz="0.11 0 -0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.14" upper="3.14" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_5_tibia">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/tibia.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="black"/>
+    </visual>
+  </link>
+
+  <joint name="joint_6_coxa" type="revolute">
+    <parent link="base_link"/>
+    <child link="leg_6_coxa"/>
+    <origin xyz="0.0852 0.06720000000000001 0" rpy="0 0 0.668"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_6_coxa">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/coxa.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="red"/>
+    </visual>
+  </link>
+
+  <joint name="joint_6_femur" type="revolute">
+    <parent link="leg_6_coxa"/>
+    <child link="leg_6_femur"/>
+    <origin xyz="0.0464 0 0.015" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_6_femur">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/femur.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="silver"/>
+    </visual>
+  </link>
+
+  <joint name="joint_6_tibia" type="revolute">
+    <parent link="leg_6_femur"/>
+    <child link="leg_6_tibia"/>
+    <origin xyz="0.11 0 -0.0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.14" upper="3.14" effort="1000" velocity="1.0"/>
+  </joint>
+
+  <link name="leg_6_tibia">
+    <visual>
+      <geometry><mesh filename="package://my_hexapod/meshes/tibia.stl"/></geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/> <material name="black"/>
+    </visual>
+  </link>
 </robot>
