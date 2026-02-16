@@ -2,9 +2,9 @@
     "i2c_address": 64,
     "frequency": 50,
     "servos": {
-        "joint_1_coxa":  { "pin": 0, "center": 180, "offset": 0,   "dir": -1 },
-        "joint_1_femur": { "pin": 1, "center": 180, "offset": -20, "dir": -1 },
-        "joint_1_tibia": { "pin": 2, "center": 180, "offset": 0,   "dir": -1 },
+        "joint_1_coxa":  { "pin": 0, "center": 180, "offset": 0,   "dir": 1 },
+        "joint_1_femur": { "pin": 1, "center": 180, "offset": 20,  "dir": 1 },
+        "joint_1_tibia": { "pin": 2, "center": 180, "offset": 0,   "dir": 1 },
 
         "joint_2_coxa":  { "pin": 3, "center": 180, "offset": 0,   "dir": -1 },
         "joint_2_femur": { "pin": 4, "center": 180, "offset": -20, "dir": -1 },

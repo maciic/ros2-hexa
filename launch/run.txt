@@ -1,0 +1,16 @@
+colcon build --symlink-install
+source install/setup.bash
+ros2 launch my_hexapod display.launch.py
+
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+
+# Nézzük meg, hány robot_node fut valójában
+ps aux | grep robot_node
+
+Kill robot node
+killall -9 robot_node
+
+vagy:
+ros2 daemon stop
+# Majd indítsd el CSAK a launch fájlt:
+ros2 launch my_hexapod display.launch.py

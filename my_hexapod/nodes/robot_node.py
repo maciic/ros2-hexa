@@ -47,7 +47,7 @@ class HexapodController(Node):
         self.debug_pub = self.create_publisher(Twist, 'current_vel', 1)
         self.subscription = self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
         
-        self.timer = self.create_timer(1.0 / 25.0, self.timer_callback)
+        self.timer = self.create_timer(1.0 / 50.0, self.timer_callback)
         self.start_time = time.time()
         
         self.get_logger().info("Hexapod Controller: Modular & Ready! 🚀")

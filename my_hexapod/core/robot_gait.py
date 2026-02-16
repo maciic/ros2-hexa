@@ -5,9 +5,9 @@ class HexapodGait:
         # Járás paraméterek (default értékek, felülírhatóak)
         self.params = {
             'freq': 4.0,           # Sebesség (Hz)
-            'step_len': 40.0,      # Lépéshossz (mm)
-            'step_height': 30.0,   # Lépésmagasság (mm)
-            'base_dist': 220.0,    # Alap terpesz
+            'step_len': 200.0,      # Lépéshossz (mm)
+            'step_height': 40.0,   # Lépésmagasság (mm)
+            'base_dist': 250.0,    # Alap terpesz
             'base_height': -100.0  # Test magasság
         }
 

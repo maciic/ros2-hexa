@@ -12,14 +12,16 @@ try:
     import busio
     from adafruit_pca9685 import PCA9685
     from adafruit_motor import servo
-    HARDWARE_AVAILABLE = True
+    IMPORT_SUCCESS = True
 except ImportError:
-    HARDWARE_AVAILABLE = False
+    IMPORT_SUCCESS = False
 
 class ServoNode(Node):
     def __init__(self):
         super().__init__('hexapod_hardware')
         
+        self.hardware_available = IMPORT_SUCCESS
+
         # 1. KONFIG BETÖLTÉSE
         script_dir = os.path.dirname(os.path.realpath(__file__))
         config_path = os.path.join(script_dir, '..', 'config', 'servo_map.json')
@@ -31,7 +33,7 @@ class ServoNode(Node):
         self.servos = {} # Itt tároljuk a szervó objektumokat
 
         # 2. HARDVER INICIALIZÁLÁS (test4.py alapján)
-        if HARDWARE_AVAILABLE:
+        if self.hardware_available:
             try:
                 self.i2c = busio.I2C(SCL, SDA)
                 self.pca = PCA9685(self.i2c)
@@ -51,9 +53,9 @@ class ServoNode(Node):
                 
             except Exception as e:
                 self.get_logger().error(f"HARDVER HIBA: {e}")
-                HARDWARE_AVAILABLE = False
+                self.hardware_available = False
         
-        if not HARDWARE_AVAILABLE:
+        if not self.hardware_available:
             self.get_logger().warn("⚠️ Nincs I2C hardver (DUMMY MÓD) - Csak szimuláció")
 
         # 3. ROS FELIRATKOZÁS
@@ -88,7 +90,7 @@ class ServoNode(Node):
         # msg.position: [0.5, ...] (radiánban)
         
         for i, name in enumerate(msg.name):
-            if name in self.servos and HARDWARE_AVAILABLE:
+            if name in self.servos and self.hardware_available:
                 angle_rad = msg.position[i]
                 cfg = self.servo_map[name]
                 
@@ -98,19 +100,20 @@ class ServoNode(Node):
                 # Küldés a motornak
                 try:
                     self.servos[name].angle = target_angle
+                    self.get_logger().info(f"Servo {name} angle: {target_angle}")
                 except ValueError:
                     # Ha a szög kívül esik a tartományon, a library hibát dobhat
                     pass
-            elif name in self.servo_map and not HARDWARE_AVAILABLE:
+            elif name in self.servo_map and not self.hardware_available:
                 # Dummy log csak az 1-es lábra, hogy ne floodoljon
                 if "joint_1" in name:
                      cfg = self.servo_map[name]
                      deg = self.rad_to_degree_mapped(msg.position[i], cfg)
-                     # self.get_logger().info(f"{name}: {deg:.1f}°")
+                     self.get_logger().info(f"{name}: {deg:.1f}°")
 
     def __del__(self):
         # Destruktor: Ha leállítjuk a node-ot, engedje el a motorokat
-        if HARDWARE_AVAILABLE and hasattr(self, 'pca'):
+        if self.hardware_available and hasattr(self, 'pca'):
             self.get_logger().info("Szervók elengedése...")
             self.pca.deinit()
 
