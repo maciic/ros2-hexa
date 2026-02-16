@@ -4,7 +4,7 @@ class HexapodGait:
     def __init__(self):
         # Járás paraméterek (default értékek, felülírhatóak)
         self.params = {
-            'freq': 4.0,           # Sebesség (Hz)
+            'freq': 1.0,           # Sebesség (Hz)
             'step_len': 200.0,      # Lépéshossz (mm)
             'step_height': 40.0,   # Lépésmagasság (mm)
             'base_dist': 250.0,    # Alap terpesz
@@ -20,7 +20,7 @@ class HexapodGait:
         if leg_key not in group_a:
             phase_offset = math.pi # B csoport ellentétes fázisban
             
-        return (t * self.params['freq']) + phase_offset
+        return (t * self.params['freq'] * 2 * math.pi) + phase_offset
 
     def calculate_step_offset(self, phase, vel_x, vel_y, vel_yaw):
         """ 

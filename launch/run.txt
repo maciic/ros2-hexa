@@ -13,4 +13,8 @@ killall -9 robot_node
 vagy:
 ros2 daemon stop
 # Majd indítsd el CSAK a launch fájlt:
-ros2 launch my_hexapod display.launch.py
+ros2 launch my_hexapod display.launch.
+
+
+REMEMBER.
+Right side first in the Servo_map

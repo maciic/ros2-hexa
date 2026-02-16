@@ -73,7 +73,7 @@ class ServoNode(Node):
         Példa a test4.py alapján: 180 - (fok + 20)
         Itt: Center=180, Irány=-1, Offset=20
         """
-        deg = math.degrees(angle_rad)
+        deg = round(math.degrees(angle_rad))
         
         # 1. Hozzáadjuk a fizikai offsetet (pl. a Femur +20 foka)
         deg_offset = deg + cfg['offset']
@@ -96,11 +96,15 @@ class ServoNode(Node):
                 
                 # Konverzió
                 target_angle = self.rad_to_degree_mapped(angle_rad, cfg)
+                # --- DEBUG LOG ---
+                # Csak az 1-es láb femur szervóját logoljuk, hogy ne legyen káosz
+                if "joint_1" in name and "coxa" in name:
+                     self.get_logger().info(f"[{name}] Rad: {angle_rad:.3f} -> Deg: {target_angle:.1f}")
+                # -----------------
                 
                 # Küldés a motornak
                 try:
                     self.servos[name].angle = target_angle
-                    self.get_logger().info(f"Servo {name} angle: {target_angle}")
                 except ValueError:
                     # Ha a szög kívül esik a tartományon, a library hibát dobhat
                     pass
