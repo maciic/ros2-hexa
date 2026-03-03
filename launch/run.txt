@@ -23,5 +23,10 @@ ros2 daemon stop
 ros2 launch my_hexapod display.launch.
 
 
+# IP address lekérése:
+-----------------------------------
+hostname -i
+
+
 REMEMBER.
 Right side first in the Servo_map

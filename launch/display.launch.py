@@ -40,17 +40,27 @@ def generate_launch_description():
         #     output='screen'
         # ),
         
-        Node(
-            package='my_hexapod',
-            executable='robot_node',
-            name='robot_node',
-            output='screen'
-        ),
+        # # Base ik_node
+        # Node(
+        #     package='my_hexapod',
+        #     executable='robot_node',
+        #     name='robot_node',
+        #     output='screen'
+        # ),
         
+        # Servo node
         Node(
             package='my_hexapod',
             executable='servo_node',
             name='servo_node',
+            output='screen'
+        ),
+        
+        # Battery node
+        Node(
+            package='my_hexapod',
+            executable='battery_node',
+            name='battery_node',
             output='screen'
         ),
         

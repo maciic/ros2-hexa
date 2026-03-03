@@ -36,8 +36,10 @@ setup(
             # A Fő agy (Régi ik_node helyett)
             'robot_node = my_hexapod.nodes.robot_node:main',
             
-            # A hardveres interfész (Ha majd kész lesz a kód benne)
+            # A hardveres interfész 
             'servo_node = my_hexapod.nodes.servo_node:main',
+            
+            'battery_node = my_hexapod.nodes.battery_node:main',
         ],
     },
 )
