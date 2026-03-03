@@ -9,7 +9,7 @@ import traceback
 
 # Rántsuk le a leplet a rejtett import hibáról!
 try:
-    from board import SCL, SDA
+    from board import SCL, SDA 
     import busio
     from adafruit_pca9685 import PCA9685
     from adafruit_motor import servo
@@ -45,6 +45,10 @@ class ServoNode(Node):
                 self.i2c = busio.I2C(SCL, SDA)
                 freq = self.config.get('frequency', 50)
                 
+                # ÚJ: Globális min és max pulse beolvasása (alapértelmezett az Adafruit 750/2250)
+                self.global_min_pulse = self.config.get('min_pulse', 500)
+                self.global_max_pulse = self.config.get('max_pulse', 2500)
+                
                 self.get_logger().info("I2C busz megnyitva, szervóvezérlők keresése...")
 
                 # --- KIFEJEZETT PÉLDÁNYOSÍTÁS MINDKÉT PANELRE ---
@@ -79,7 +83,11 @@ class ServoNode(Node):
                     # Csak akkor hozzuk létre, ha a panel él, és létező csatorna (0-15)
                     if board_addr in self.pcas and pin < 16: 
                         # Létrehozzuk az adafruit_motor szervó objektumot a megfelelő panelen
-                        self.servos[name] = servo.Servo(self.pcas[board_addr].channels[pin])
+                        self.servos[name] = servo.Servo(
+                            self.pcas[board_addr].channels[pin],
+                            min_pulse=self.global_min_pulse,
+                            max_pulse=self.global_max_pulse
+                        )
                 
                 self.get_logger().info(f"Összesen {len(self.servos)} szervó inicializálva! 🔌")
                 

@@ -40,6 +40,7 @@ class HexapodController(Node):
         self.ramp_step = 0.05
         
         self.body_rpy = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}
+        self.breathe_z = 0.0
 
         # 4. ROS KOMMUNIKÁCIÓ
         self.joint_pub = self.create_publisher(JointState, 'joint_states', 1)
@@ -92,6 +93,9 @@ class HexapodController(Node):
         target_x = neutral_x + off_walk + dx_rot
         target_y = neutral_y + off_strafe + dy_rot
         target_z = self.gait.params['base_height'] + off_z
+        
+        # ÚJ: Hozzáadjuk a lélegzésből fakadó magasságváltozást
+        target_z = self.gait.params['base_height'] + off_z + self.breathe_z
 
         # C. KINEMATIKA (Kinematics Module)
         # 1. Transzformáljuk a pontot a láb lokális rendszerébe + Alkalmazzuk a Body IK-t
@@ -120,14 +124,26 @@ class HexapodController(Node):
         d_msg.angular.z = self.current_vel['yaw']
         self.debug_pub.publish(d_msg)
 
-        # 3. Demo Mód (Body IK)
+        # 3. Demo Mód (Lélegzés / Breathing)
         now = time.time()
         t = now - self.start_time
         
         if abs(self.cmd_vel['x']) < 0.01 and abs(self.cmd_vel['y']) < 0.01 and abs(self.cmd_vel['yaw']) < 0.01:
-            self.body_rpy['pitch'] = math.sin(t * 2.0) * 0.15
-            self.body_rpy['roll']  = math.cos(t * 2.0) * 0.15
+            # 3 másodperces ciklus: 2s mozgás, 1s pihenés
+            cycle_time = 3.0
+            t_cycle = t % cycle_time
+            
+            if t_cycle < 2.0:
+                # Egy sima szinusz hullám, ami 0-ról indul, felmegy a csúcsra, majd visszatér 0-ra
+                # A -15.0 a mozgás amplitúdója milliméterben (mivel a Z lefelé pozitív a lábhoz képest, a negatív érték emeli a testet)
+                self.breathe_z = math.sin((t_cycle / 2.0) * math.pi) * -15.0
+            else:
+                # 1 másodperc várakozás alaphelyzetben
+                self.breathe_z = 0.0
+                
+            self.body_rpy = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}
         else:
+            self.breathe_z = 0.0
             self.body_rpy = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}
 
         # 4. Lábak mozgatása

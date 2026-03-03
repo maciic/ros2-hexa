@@ -49,7 +49,7 @@ class BatteryNode(Node):
 
             # Töltöttség számítása (3S LiPo)
             MAX_V = 12.6
-            MIN_V = 9.9
+            MIN_V = 10.5
             pct = max(0, min(100, int(((voltage - MIN_V) / (MAX_V - MIN_V)) * 100)))
 
             # 1. Nyers feszültség küldése (Float) - Jó lehet pl. Foxglove grafikonhoz
