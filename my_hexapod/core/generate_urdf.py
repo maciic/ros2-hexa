@@ -4,8 +4,8 @@ def generate_urdf():
     # 1. Beolvassuk a konfigot    
     script_dir = os.path.dirname(os.path.realpath(__file__))
     CONFIG_PATH = os.path.join(script_dir, '..', 'config', 'robot_dimension.json')
-    URDF_PATH = "./urdf/hexapod.urdf"
-    
+    URDF_PATH = os.path.join(script_dir, '..', '..', 'urdf', 'hexapod.urdf')
+
     with open(CONFIG_PATH, 'r') as f:
         config = json.load(f)
 

@@ -151,7 +151,7 @@
   <joint name="joint_4_coxa" type="revolute">
     <parent link="base_link"/>
     <child link="leg_4_coxa"/>
-    <origin xyz="-0.0852 0.06720000000000001 0" rpy="0 0 2.4735"/>
+    <origin xyz="0.0852 0.06720000000000001 0" rpy="0 0 0.668"/>
     <axis xyz="0 0 1"/>
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
   </joint>
@@ -241,7 +241,7 @@
   <joint name="joint_6_coxa" type="revolute">
     <parent link="base_link"/>
     <child link="leg_6_coxa"/>
-    <origin xyz="0.0852 0.06720000000000001 0" rpy="0 0 0.668"/>
+    <origin xyz="-0.0852 0.06720000000000001 0" rpy="0 0 2.4735"/>
     <axis xyz="0 0 1"/>
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="1.0"/>
   </joint>

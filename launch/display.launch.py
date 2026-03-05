@@ -48,13 +48,13 @@ def generate_launch_description():
             output='screen'
         ),
 
-        # #Servo node
-        # Node(
-        #     package='my_hexapod',
-        #     executable='servo_node',
-        #     name='servo_node',
-        #     output='screen'
-        # ),
+        #Servo node
+        Node(
+            package='my_hexapod',
+            executable='servo_node',
+            name='servo_node',
+            output='screen'
+        ),
 
         # Battery node
         Node(

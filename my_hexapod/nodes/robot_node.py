@@ -108,51 +108,59 @@ class HexapodController(Node):
         target_x = neutral_x + off_walk + dx_rot
         target_y = neutral_y + off_strafe + dy_rot
         
-        # --- DROP AND LOCK LOGIKA Z TENGELYRE ---
-        # Megnézzük, hogy egyáltalán akar-e mozogni a robot
-        is_moving = abs(self.current_vel['x']) > 0.01 or abs(self.current_vel['y']) > 0.01 or abs(self.current_vel['yaw']) > 0.01
+        # Végső CÉLPONT (Test koordinátarendszerben)
+        # Ez az a pont a térben, ahova a láb végét tenni akarjuk (Body IK nélkül)
+        target_x = neutral_x + off_walk + dx_rot
+        target_y = neutral_y + off_strafe + dy_rot
         
-        # CSAK akkor emeli a lábát, ha haladni is akar, ÉS a járásfázis ott tart
-        is_swing = is_moving and (math.sin(phase) > 0.0)
-        contact = self.leg_contacts.get(leg_key, 0)
-        state = self.leg_states[leg_key]
+        # Sima, időalapú Z magasság a szinuszgörbéből és a lélegzésből
+        target_z = self.gait.params['base_height'] + off_z + self.breathe_z
         
-        if is_swing:
-            # 1. FÁZIS: EMELÉS ÉS ELŐRELENDÍTÉS (Swing)
-            state["locked"] = False
+        # # --- DROP AND LOCK V2: TERRAIN MEMORY ---
+        # is_moving = abs(self.current_vel['x']) > 0.01 or abs(self.current_vel['y']) > 0.01 or abs(self.current_vel['yaw']) > 0.01
+        # phase_sin = math.sin(phase)
+        # phase_cos = math.cos(phase) # ÚJ: Ebből tudjuk, hogy a láb épp felfelé vagy lefelé mozog a levegőben
+        
+        # contact = self.leg_contacts.get(leg_key, 0)
+        # state = self.leg_states[leg_key]
+        
+        # if is_moving and phase_sin > 0.0:
+        #     # --- 1. LÉPÉS FÁZIS (Levegőben) ---
             
-            # Hogy ne ugorjon a láb hirtelen alaphelyzetbe (ha előtte egy gödörben volt),
-            # szépen fokozatosan "felhúzzuk" a z_offset-et 0-ra. (2.0 mm / tick)
-            if state["z_offset"] < 0:
-                state["z_offset"] += 2.0 
-                if state["z_offset"] > 0: 
-                    state["z_offset"] = 0.0
-                    
-            # A magasság az alap, plusz a gait által számolt szinuszos emelés, plusz a lélegzés
-            final_z_offset = off_z + state["z_offset"]
+        #     # A fázis első felében (felfelé mozgás) biztosan feloldjuk a zárolást
+        #     if phase_cos >= 0.0:
+        #         state["locked"] = False
+                
+        #     if not state["locked"]:
+        #         # Lefelé jövünk a levegőben, és idő előtt földet értünk (pl. egy kőre vagy emelkedőre léptünk)
+        #         if phase_cos < 0.0 and contact == 1:
+        #             state["locked"] = True
+        #             # Rögzítjük az új, magasabb talajszintet: a jelenlegi memória + amennyit a szinusz emelt rajta
+        #             state["z_offset"] += off_z
+        #             final_z_offset = state["z_offset"]
+        #         else:
+        #             # Normál repülés a levegőben, a memória megmarad!
+        #             final_z_offset = state["z_offset"] + off_z
+        #     else:
+        #         # Már földet ért a lengés alatt, tartsa az új magasságot
+        #         final_z_offset = state["z_offset"]
+        # else:
+        #     # --- 2. TÁMASZ / KERESÉS FÁZIS (Földön) ---
+        #     if not state["locked"]:
+        #         if contact == 1:
+        #             # Megtalálta a talajt (gödör vagy sík terep esetén)
+        #             state["locked"] = True
+        #         else:
+        #             # Keresi a talajt (nyújtja a lábát lefelé)
+        #             state["z_offset"] -= 4.0  # Kicsit gyorsítottunk a keresésen, hogy hamarabb megtalálja
+        #             if state["z_offset"] < -50.0:
+        #                 state["z_offset"] = -50.0 # Max 5 centit nyúlhat le
             
-        else:
-            # 2. FÁZIS: KERESÉS ÉS TÁMASZ (Reach & Stance)
-            if not state["locked"]:
-                if contact == 1:
-                    # FÖLDET ÉRT! Zároljuk a pozíciót.
-                    state["locked"] = True
-                else:
-                    # Még a levegőben van, ejtjük a lábat (Z csökkentése). 
-                    # 50Hz-nél a 3.0 mm/tick az 15 cm/sec süllyedési sebességet jelent.
-                    state["z_offset"] -= 3.0
-                    
-                    # Biztonsági limit: maximum 4 centit (40mm) süllyedhet, nehogy szétfeszítse a robotot
-                    if state["z_offset"] < -40.0:  
-                        state["z_offset"] = -40.0
-                        
-            # Ha már locked (vagy elérte a limitet), a z_offset nem változik tovább.
-            # Itt az 'off_z' amúgy is 0 lenne a robot_gait.py alapján, így a saját offsetünket használjuk.
-            final_z_offset = state["z_offset"]
-
-        # Végleges Z magasság alkalmazása
-        target_z = self.gait.params['base_height'] + final_z_offset + self.breathe_z
-        # ----------------------------------------
+        #     final_z_offset = state["z_offset"]
+            
+        # # Végleges Z magasság alkalmazása
+        # target_z = self.gait.params['base_height'] + final_z_offset + self.breathe_z
+        # # ----------------------------------------
 
         # C. KINEMATIKA (Kinematics Module)
         # 1. Transzformáljuk a pontot a láb lokális rendszerébe + Alkalmazzuk a Body IK-t
