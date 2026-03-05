@@ -64,6 +64,14 @@ def generate_launch_description():
             output='screen'
         ),
         
+        # Contact / Szenzor node
+        Node(
+            package='my_hexapod',
+            executable='contact_node',
+            name='contact_node',
+            output='screen'
+        ),
+        
         # 3. A Foxglove híd
         Node(
             package='foxglove_bridge',

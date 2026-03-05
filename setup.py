@@ -39,7 +39,11 @@ setup(
             # A hardveres interfész 
             'servo_node = my_hexapod.nodes.servo_node:main',
             
+            # Az aksi állapota
             'battery_node = my_hexapod.nodes.battery_node:main',
+            
+            # A talajérzékelő mikrokapcsolók
+            'contact_node = my_hexapod.nodes.contact_node:main',
         ],
     },
 )

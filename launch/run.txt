@@ -29,4 +29,4 @@ hostname -i
 
 
 REMEMBER.
-Right side first in the Servo_map
+A servok telepítéséhez valami trükk kell
