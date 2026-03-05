@@ -3,6 +3,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Twist 
+from std_msgs.msg import Int8MultiArray
 import json
 import time
 import math
@@ -29,10 +30,6 @@ class HexapodController(Node):
         # 2. SEGÉDOSZTÁLYOK INICIALIZÁLÁSA
         self.kinematics = HexapodKinematics(self.config)
         self.gait = HexapodGait()
-        
-        # Átadjuk a configból a gait paramétereket is, ha vannak
-        # (Itt most a defaultot használjuk a robot_gait.py-ból, de felülírható)
-        # self.gait.params.update(...) 
 
         # 3. ÁLLAPOTVÁLTOZÓK
         self.cmd_vel = {'x': 0.0, 'y': 0.0, 'yaw': 0.0}
@@ -41,12 +38,24 @@ class HexapodController(Node):
         
         self.body_rpy = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}
         self.breathe_z = 0.0
+        
+        # ÚJ: Változók a talajkövetéshez
+        # Tároljuk, hogy melyik láb érinti a földet (1) vagy van a levegőben (0)
+        self.leg_contacts = {f"leg_{i}": 0 for i in range(1, 7)}
+        # Tároljuk a rögzített Z magasságot minden lábhoz, amikor földet ér
+        self.leg_z_offsets = {f"leg_{i}": 0.0 for i in range(1, 7)}
+        
+        # ÚJ: Állapotgép a Drop and Lock logikához
+        self.leg_states = {
+            f"leg_{i}": {"locked": False, "z_offset": 0.0} for i in range(1, 7)
+        }
 
         # 4. ROS KOMMUNIKÁCIÓ
         self.joint_pub = self.create_publisher(JointState, 'joint_states', 1)
         self.marker_pub = self.create_publisher(Marker, 'target_marker', 1)
         self.debug_pub = self.create_publisher(Twist, 'current_vel', 1)
         self.subscription = self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
+        self.contact_sub = self.create_subscription(Int8MultiArray, 'leg_contacts', self.contact_callback, 10)
         
         self.timer = self.create_timer(1.0 / 50.0, self.timer_callback)
         self.start_time = time.time()
@@ -57,6 +66,13 @@ class HexapodController(Node):
         self.cmd_vel['x'] = msg.linear.x
         self.cmd_vel['y'] = msg.linear.y
         self.cmd_vel['yaw'] = msg.angular.z
+        
+    def contact_callback(self, msg):
+        """ Beolvassa a kapcsolók állapotát a szenzor node-ból """
+        # A tömbünk 6 elemű, indexek: 0..5, a lábak nevei: leg_1..leg_6
+        for i, state in enumerate(msg.data):
+            leg_key = f"leg_{i+1}"
+            self.leg_contacts[leg_key] = state
 
     def ramp_value(self, current, target, step):
         if current < target:
@@ -88,14 +104,55 @@ class HexapodController(Node):
         dx_rot = (-neutral_y / dist) * off_turn
         dy_rot = (neutral_x / dist) * off_turn
 
-        # Végső CÉLPONT (Test koordinátarendszerben)
-        # Ez az a pont a térben, ahova a láb végét tenni akarjuk (Body IK nélkül)
+        # Végső CÉLPONT X és Y (Test koordinátarendszerben)
         target_x = neutral_x + off_walk + dx_rot
         target_y = neutral_y + off_strafe + dy_rot
-        target_z = self.gait.params['base_height'] + off_z
         
-        # ÚJ: Hozzáadjuk a lélegzésből fakadó magasságváltozást
-        target_z = self.gait.params['base_height'] + off_z + self.breathe_z
+        # --- DROP AND LOCK LOGIKA Z TENGELYRE ---
+        # Megnézzük, hogy egyáltalán akar-e mozogni a robot
+        is_moving = abs(self.current_vel['x']) > 0.01 or abs(self.current_vel['y']) > 0.01 or abs(self.current_vel['yaw']) > 0.01
+        
+        # CSAK akkor emeli a lábát, ha haladni is akar, ÉS a járásfázis ott tart
+        is_swing = is_moving and (math.sin(phase) > 0.0)
+        contact = self.leg_contacts.get(leg_key, 0)
+        state = self.leg_states[leg_key]
+        
+        if is_swing:
+            # 1. FÁZIS: EMELÉS ÉS ELŐRELENDÍTÉS (Swing)
+            state["locked"] = False
+            
+            # Hogy ne ugorjon a láb hirtelen alaphelyzetbe (ha előtte egy gödörben volt),
+            # szépen fokozatosan "felhúzzuk" a z_offset-et 0-ra. (2.0 mm / tick)
+            if state["z_offset"] < 0:
+                state["z_offset"] += 2.0 
+                if state["z_offset"] > 0: 
+                    state["z_offset"] = 0.0
+                    
+            # A magasság az alap, plusz a gait által számolt szinuszos emelés, plusz a lélegzés
+            final_z_offset = off_z + state["z_offset"]
+            
+        else:
+            # 2. FÁZIS: KERESÉS ÉS TÁMASZ (Reach & Stance)
+            if not state["locked"]:
+                if contact == 1:
+                    # FÖLDET ÉRT! Zároljuk a pozíciót.
+                    state["locked"] = True
+                else:
+                    # Még a levegőben van, ejtjük a lábat (Z csökkentése). 
+                    # 50Hz-nél a 3.0 mm/tick az 15 cm/sec süllyedési sebességet jelent.
+                    state["z_offset"] -= 3.0
+                    
+                    # Biztonsági limit: maximum 4 centit (40mm) süllyedhet, nehogy szétfeszítse a robotot
+                    if state["z_offset"] < -40.0:  
+                        state["z_offset"] = -40.0
+                        
+            # Ha már locked (vagy elérte a limitet), a z_offset nem változik tovább.
+            # Itt az 'off_z' amúgy is 0 lenne a robot_gait.py alapján, így a saját offsetünket használjuk.
+            final_z_offset = state["z_offset"]
+
+        # Végleges Z magasság alkalmazása
+        target_z = self.gait.params['base_height'] + final_z_offset + self.breathe_z
+        # ----------------------------------------
 
         # C. KINEMATIKA (Kinematics Module)
         # 1. Transzformáljuk a pontot a láb lokális rendszerébe + Alkalmazzuk a Body IK-t

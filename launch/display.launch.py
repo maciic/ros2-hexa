@@ -31,7 +31,7 @@ def generate_launch_description():
         #     name='joint_state_publisher_gui',
         #     output='screen'
         # ),
-        
+
         #Backup ik_node ha kellene még tesztelni
         # Node(
         #     package='my_hexapod',
@@ -39,7 +39,7 @@ def generate_launch_description():
         #     name='  ik_node_backup',
         #     output='screen'
         # ),
-        
+
         # Base ik_node
         Node(
             package='my_hexapod',
@@ -47,15 +47,15 @@ def generate_launch_description():
             name='robot_node',
             output='screen'
         ),
-        
-        # Servo node
-        Node(
-            package='my_hexapod',
-            executable='servo_node',
-            name='servo_node',
-            output='screen'
-        ),
-        
+
+        # #Servo node
+        # Node(
+        #     package='my_hexapod',
+        #     executable='servo_node',
+        #     name='servo_node',
+        #     output='screen'
+        # ),
+
         # Battery node
         Node(
             package='my_hexapod',
@@ -63,7 +63,7 @@ def generate_launch_description():
             name='battery_node',
             output='screen'
         ),
-        
+
         # Contact / Szenzor node
         Node(
             package='my_hexapod',
@@ -71,7 +71,7 @@ def generate_launch_description():
             name='contact_node',
             output='screen'
         ),
-        
+
         # 3. A Foxglove híd
         Node(
             package='foxglove_bridge',
