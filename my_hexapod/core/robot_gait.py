@@ -6,7 +6,7 @@ class HexapodGait:
         self.params = {
             'freq': 1.0,           # Sebesség (Hz)
             'step_len': 200.0,      # Lépéshossz (mm)
-            'step_height': 40.0,   # Lépésmagasság (mm)
+            'step_height': 60.0,   # Lépésmagasság (mm)
             'base_dist': 250.0,    # Alap terpesz
             'base_height': -100.0  # Test magasság
         }
