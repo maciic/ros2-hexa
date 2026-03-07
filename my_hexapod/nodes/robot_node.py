@@ -131,15 +131,19 @@ class HexapodController(Node):
             if t_cycle < 2.0:
                 # Egy sima szinusz hullám, ami 0-ról indul, felmegy a csúcsra, majd visszatér 0-ra
                 # A -15.0 a mozgás amplitúdója milliméterben (mivel a Z lefelé pozitív a lábhoz képest, a negatív érték emeli a testet)
-                self.breathe_z = math.sin((t_cycle / 2.0) * math.pi) * -15.0
+                self.breathe_z = math.sin((t_cycle / 2.0) * math.pi) * 0.0
             else:
                 # 1 másodperc várakozás alaphelyzetben
                 self.breathe_z = 0.0
                 
-            self.body_rpy = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}
+            # --- ÚJ: SZOFTVERES FENEKEMELÉS (ÁLLÓ HELYZETBEN) ---
+            # A pitch a bólogatás. -5.0 fok általában előre dönti (emeli a hátulját).
+            # Ha nálad pont az orrát emelné fel, akkor írd át +5.0-re!
+            self.body_rpy = {'roll': 0.0, 'pitch': math.radians(-5.0), 'yaw': 0.0}
         else:
             self.breathe_z = 0.0
-            self.body_rpy = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}
+            # --- ÚJ: SZOFTVERES FENEKEMELÉS (SÉTA KÖZBEN IS) ---
+            self.body_rpy = {'roll': 0.0, 'pitch': math.radians(-5.0), 'yaw': 0.0}
 
         # 4. Lábak mozgatása
         all_joints = {}

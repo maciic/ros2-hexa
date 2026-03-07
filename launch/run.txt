@@ -14,6 +14,10 @@ ros2 run my_hexapod *name of the node*
 -----------------------------------
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 
+#Basic joystick input
+-----------------------------------
+ros2 run teleop_twist_joy teleop_node --ros-args -p axis_linear.x:=1 -p axis_linear.y:=0 -p axis_angular.yaw:=3 -p require_enable_button:=false
+
 # Nézzük meg, hány robot_node fut valójában
 -----------------------------------
 ps aux | grep robot_node

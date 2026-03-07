@@ -72,6 +72,38 @@ def generate_launch_description():
             output='screen'
         ),
 
+        # 1. Joy Node (Kiolvassa a PS5 kontrollert)
+        Node(
+            package='joy',
+            executable='joy_node',
+            name='joy_node',
+            parameters=[{
+                # Ha a jstest alapján nem js0 volt, hanem pl. js1, akkor írd át itt!
+                # 'dev': '/dev/input/js1', 
+                'deadzone': 0.05,
+                'autorepeat_rate': 20.0,
+            }]
+        ),
+
+        # 2. Teleop Node (Lefordítja a karokat mozgás-parancsokká)
+        Node(
+            package='teleop_twist_joy',
+            executable='teleop_node',
+            name='teleop_node',
+            parameters=[{
+                'require_enable_button': False,  # Nem kell gombot nyomva tartani a mozgáshoz
+                'axis_linear.x': 1,              # Bal kar Fel/Le -> Előre/Hátra
+                'axis_linear.y': 0,              # Bal kar Balra/Jobbra -> Oldalazás
+                'axis_angular.yaw': 3,           # Jobb kar Balra/Jobbra -> Forgás
+                
+                # --- ITT VANNAK A BŰVÖS SZORZÓK ---
+                # Ne engedjük 1.0-ig! Így marad hely a kombinált mozgásnak.
+                'scale_linear.x': 0.7,     # Maximum 70%-os előre/hátra lépés
+                'scale_linear.y': 0.7,     # Maximum 70%-os oldalazás
+                'scale_angular.yaw': 0.5,  # A forgást még jobban le is fojthatjuk (50%)
+            }]
+        ),
+
         # 3. A Foxglove híd
         Node(
             package='foxglove_bridge',
