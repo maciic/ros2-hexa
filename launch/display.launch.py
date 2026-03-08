@@ -98,9 +98,9 @@ def generate_launch_description():
                 
                 # --- ITT VANNAK A BŰVÖS SZORZÓK ---
                 # Ne engedjük 1.0-ig! Így marad hely a kombinált mozgásnak.
-                'scale_linear.x': 0.7,     # Maximum 70%-os előre/hátra lépés
-                'scale_linear.y': 0.7,     # Maximum 70%-os oldalazás
-                'scale_angular.yaw': 0.5,  # A forgást még jobban le is fojthatjuk (50%)
+                'scale_linear.x': 1.0,     # Maximum 70%-os előre/hátra lépés
+                'scale_linear.y': 1.0,     # Maximum 70%-os oldalazás
+                'scale_angular.yaw': 1.0,  # A forgást még jobban le is fojthatjuk (50%)
             }]
         ),
 

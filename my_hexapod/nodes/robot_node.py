@@ -1,8 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Twist 
+from rcl_interfaces.msg import SetParametersResult
 import json
 import time
 import math
@@ -33,14 +33,35 @@ class HexapodController(Node):
         # 3. ÁLLAPOTVÁLTOZÓK
         self.cmd_vel = {'x': 0.0, 'y': 0.0, 'yaw': 0.0}
         self.current_vel = {'x': 0.0, 'y': 0.0, 'yaw': 0.0}
-        self.ramp_step = 0.05
+        self.ramp_step = 0.02  #Gyorsulás lépésenként (0.01 = 1% gyorsulás minden ciklusban)
         
         self.body_rpy = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}
         self.breathe_z = 0.0
+        
+        # 4. DINAMIKUS PARAMÉTEREK DEKLARÁLÁSA
+        self.declare_parameters(
+            namespace='',
+            parameters=[
+                ('gait_freq', 1.0),
+                ('gait_step_len', 100.0),
+                ('gait_step_height', 40.0),
+                ('gait_base_dist', 250.0),
+                ('gait_base_height', -100.0)
+            ]
+        )
 
-        # 4. ROS KOMMUNIKÁCIÓ
+        # Kezdeti értékek átadása a gait modulnak
+        self.gait.params['freq'] = self.get_parameter('gait_freq').value
+        self.gait.params['step_len'] = self.get_parameter('gait_step_len').value
+        self.gait.params['step_height'] = self.get_parameter('gait_step_height').value
+        self.gait.params['base_dist'] = self.get_parameter('gait_base_dist').value
+        self.gait.params['base_height'] = self.get_parameter('gait_base_height').value
+
+        # Feliratkozás a változásokra (Ha a Foxglove-ban átírod, ez a függvény hívódik meg)
+        self.add_on_set_parameters_callback(self.parameters_callback)
+
+        # 5. ROS KOMMUNIKÁCIÓ
         self.joint_pub = self.create_publisher(JointState, 'joint_states', 1)
-        self.marker_pub = self.create_publisher(Marker, 'target_marker', 1)
         self.debug_pub = self.create_publisher(Twist, 'current_vel', 1)
         self.subscription = self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
         
@@ -53,13 +74,44 @@ class HexapodController(Node):
         self.cmd_vel['x'] = msg.linear.x
         self.cmd_vel['y'] = msg.linear.y
         self.cmd_vel['yaw'] = msg.angular.z
+        
+    def parameters_callback(self, params):
+        """ Ez fut le azonnal, amint a Foxglove-ban átállítasz egy értéket """
+        for param in params:
+            if param.name == 'gait_freq':
+                self.gait.params['freq'] = param.value
+                self.get_logger().info(f"Új sebesség (freq): {param.value}")
+            elif param.name == 'gait_step_len':
+                self.gait.params['step_len'] = param.value
+                self.get_logger().info(f"Új lépéshossz: {param.value}")
+            elif param.name == 'gait_step_height':
+                self.gait.params['step_height'] = param.value
+                self.get_logger().info(f"Új lépésmagasság: {param.value}")
+            elif param.name == 'gait_base_dist':
+                self.gait.params['base_dist'] = param.value
+                self.get_logger().info(f"Új terpesz (base_dist): {param.value}")
+            elif param.name == 'gait_base_height':
+                self.gait.params['base_height'] = param.value
+                self.get_logger().info(f"Új testmagasság: {param.value}")
+        
+        return SetParametersResult(successful=True)
 
     def ramp_value(self, current, target, step):
-        if current < target:
-            return min(current + step, target)
-        elif current > target:
-            return max(current - step, target)
-        return target
+        """ 
+        Konstans gyorsulás (Linear Ramping). 
+        A legkíméletesebb a szervóknak, mert az erőkifejtés (nyomaték) állandó.
+        """
+        diff = target - current
+        
+        # Ha a különbség kisebb, mint a lépésközünk, akkor egyből rálépünk a célra
+        if abs(diff) < step:
+            return target
+            
+        # Egyenletes lépésekkel közelítünk a cél felé
+        if diff > 0:
+            return current + step
+        else:
+            return current - step
 
     def process_leg(self, leg_key, leg_cfg, t):
         """ Egy láb teljes feldolgozása a modulok segítségével """
@@ -97,11 +149,6 @@ class HexapodController(Node):
         lx, ly, lz, global_pos = self.kinematics.body_to_leg_coords(
             target_x, target_y, target_z, leg_cfg, self.body_rpy
         )
-        
-        # Vizualizáció (opcionális, csak az 1-es lábnál)
-        # A globális, elforgatott pontot rajzoljuk ki
-        if leg_key == "leg_1":
-            self.publish_marker_global(global_pos[0], global_pos[1], global_pos[2])
 
         # 2. Kiszámoljuk a szögeket
         return self.kinematics.compute_ik(lx, ly, lz)
@@ -119,31 +166,15 @@ class HexapodController(Node):
         d_msg.angular.z = self.current_vel['yaw']
         self.debug_pub.publish(d_msg)
 
-        # 3. Demo Mód (Lélegzés / Breathing)
+        # 3. Állapotgép frissítése és Pozíciók lekérése (Az Agy / Koreográfus vezérli)
         now = time.time()
         t = now - self.start_time
         
-        if abs(self.cmd_vel['x']) < 0.01 and abs(self.cmd_vel['y']) < 0.01 and abs(self.cmd_vel['yaw']) < 0.01:
-            # 3 másodperces ciklus: 2s mozgás, 1s pihenés
-            cycle_time = 3.0
-            t_cycle = t % cycle_time
-            
-            if t_cycle < 2.0:
-                # Egy sima szinusz hullám, ami 0-ról indul, felmegy a csúcsra, majd visszatér 0-ra
-                # A -15.0 a mozgás amplitúdója milliméterben (mivel a Z lefelé pozitív a lábhoz képest, a negatív érték emeli a testet)
-                self.breathe_z = math.sin((t_cycle / 2.0) * math.pi) * 0.0
-            else:
-                # 1 másodperc várakozás alaphelyzetben
-                self.breathe_z = 0.0
-                
-            # --- ÚJ: SZOFTVERES FENEKEMELÉS (ÁLLÓ HELYZETBEN) ---
-            # A pitch a bólogatás. -5.0 fok általában előre dönti (emeli a hátulját).
-            # Ha nálad pont az orrát emelné fel, akkor írd át +5.0-re!
-            self.body_rpy = {'roll': 0.0, 'pitch': math.radians(-5.0), 'yaw': 0.0}
-        else:
-            self.breathe_z = 0.0
-            # --- ÚJ: SZOFTVERES FENEKEMELÉS (SÉTA KÖZBEN IS) ---
-            self.body_rpy = {'roll': 0.0, 'pitch': math.radians(-5.0), 'yaw': 0.0}
+        # Átadjuk a sebességeket a Koreográfusnak, ő eldönti mit csinálunk
+        self.gait.update_state(self.current_vel['x'], self.current_vel['y'], self.current_vel['yaw'])
+        
+        # Lekérjük a test dőlését és magasságát az aktuális állapot szerint
+        self.body_rpy, self.breathe_z = self.gait.get_body_pose(t)
 
         # 4. Lábak mozgatása
         all_joints = {}
@@ -154,17 +185,6 @@ class HexapodController(Node):
         self.publish_joints_all(all_joints)
 
     # ... PUBLISHEREK ...
-
-    def publish_marker_global(self, x, y, z):
-        msg = Marker()
-        msg.header.frame_id = "base_link"
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.type = Marker.SPHERE; msg.action = Marker.ADD
-        msg.pose.position.x = x/1000.0; msg.pose.position.y = y/1000.0; msg.pose.position.z = z/1000.0
-        msg.pose.orientation.w = 1.0; msg.scale.x = 0.03; msg.scale.y = 0.03; msg.scale.z = 0.03
-        msg.color.r, msg.color.g, msg.color.b, msg.color.a = 0.0, 1.0, 0.0, 1.0
-        self.marker_pub.publish(msg)
-
     def publish_joints_all(self, joint_map):
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
