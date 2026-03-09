@@ -13,12 +13,10 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
 
-        ### Én adtam hozzá
         (os.path.join('share', package_name, 'meshes'), glob('meshes/*.stl')),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'urdf'), glob('urdf/*.urdf')),
         (os.path.join('share', package_name, 'config'), glob('config/*.json')),
-        ### EDDIG ###
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -33,17 +31,12 @@ setup(
     },
     entry_points={
         'console_scripts': [          
-            # A Fő agy (Régi ik_node helyett)
-            'robot_node = my_hexapod.nodes.robot_node:main',
             
-            # A hardveres interfész 
-            'servo_node = my_hexapod.nodes.servo_node:main',
-            
-            # Az aksi állapota
-            'battery_node = my_hexapod.nodes.battery_node:main',
-            
-            # A talajérzékelő mikrokapcsolók
-            'contact_node = my_hexapod.nodes.contact_node:main',
+            'robot_node = my_hexapod.nodes.robot_node:main', # A Fő agy (Régi ik_node helyett)   
+            'servo_node = my_hexapod.nodes.servo_node:main', # A hardveres interfész 
+            'battery_node = my_hexapod.nodes.battery_node:main', # Az aksi állapota        
+            'ps5_mapper = my_hexapod.nodes.ps5_mapper_node:main', # PS5 kontroller leképezése a robot parancsaira
+            'brain_node = my_hexapod.nodes.brain_node:main', # Az agy, ami a vezérlő
         ],
     },
 )

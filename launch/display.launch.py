@@ -16,7 +16,7 @@ def generate_launch_description():
         robot_desc = infp.read()
 
     return LaunchDescription([
-        # 1. A Robot "agya", ami kiszámolja a pozíciókat
+        # 1. A Robot "agya", ami kiszámolja a pozíciókat (URDF / TF)
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
@@ -24,23 +24,8 @@ def generate_launch_description():
             output='screen',
             parameters=[{'robot_description': robot_desc}],
         ),
-        # 2. A GUI ablak a csúszkákkal (EZT ADTUK HOZZÁ)
-        # Node(
-        #     package='joint_state_publisher_gui',
-        #     executable='joint_state_publisher_gui',
-        #     name='joint_state_publisher_gui',
-        #     output='screen'
-        # ),
 
-        #Backup ik_node ha kellene még tesztelni
-        # Node(
-        #     package='my_hexapod',
-        #     executable='ik_node_backup',
-        #     name='  ik_node_backup',
-        #     output='screen'
-        # ),
-
-        # Base ik_node
+        # 2. AZ IZOMZAT (A mi új, letisztult robot_node-unk)
         Node(
             package='my_hexapod',
             executable='robot_node',
@@ -48,7 +33,7 @@ def generate_launch_description():
             output='screen'
         ),
 
-        #Servo node
+        # 3. Servo node (Hardveres kapcsolat)
         Node(
             package='my_hexapod',
             executable='servo_node',
@@ -56,7 +41,7 @@ def generate_launch_description():
             output='screen'
         ),
 
-        # Battery node
+        # 4. Battery node
         Node(
             package='my_hexapod',
             executable='battery_node',
@@ -64,7 +49,7 @@ def generate_launch_description():
             output='screen'
         ),
 
-        # Contact / Szenzor node
+        # 5. Contact / Szenzor node
         Node(
             package='my_hexapod',
             executable='contact_node',
@@ -72,39 +57,38 @@ def generate_launch_description():
             output='screen'
         ),
 
-        # 1. Joy Node (Kiolvassa a PS5 kontrollert)
+        # 6. Joy Node (Kiolvassa a PS5 kontrollert a Bluetooth-ról)
         Node(
             package='joy',
             executable='joy_node',
             name='joy_node',
             parameters=[{
-                # Ha a jstest alapján nem js0 volt, hanem pl. js1, akkor írd át itt!
-                # 'dev': '/dev/input/js1', 
                 'deadzone': 0.05,
                 'autorepeat_rate': 20.0,
             }]
         ),
 
-        # 2. Teleop Node (Lefordítja a karokat mozgás-parancsokká)
+        # --- ÚJ NODE-OK A SKYNET RENDSZERHEZ ---
+
+        # 7. A Fordító (A régi teleop_node helyett. Gombok és karok feldolgozása)
         Node(
-            package='teleop_twist_joy',
-            executable='teleop_node',
-            name='teleop_node',
-            parameters=[{
-                'require_enable_button': False,  # Nem kell gombot nyomva tartani a mozgáshoz
-                'axis_linear.x': 1,              # Bal kar Fel/Le -> Előre/Hátra
-                'axis_linear.y': 0,              # Bal kar Balra/Jobbra -> Oldalazás
-                'axis_angular.yaw': 3,           # Jobb kar Balra/Jobbra -> Forgás
-                
-                # --- ITT VANNAK A BŰVÖS SZORZÓK ---
-                # Ne engedjük 1.0-ig! Így marad hely a kombinált mozgásnak.
-                'scale_linear.x': 1.0,     # Maximum 70%-os előre/hátra lépés
-                'scale_linear.y': 1.0,     # Maximum 70%-os oldalazás
-                'scale_angular.yaw': 1.0,  # A forgást még jobban le is fojthatjuk (50%)
-            }]
+            package='my_hexapod',
+            executable='ps5_mapper',
+            name='ps5_mapper',
+            output='screen'
         ),
 
-        # 3. A Foxglove híd
+        # 8. A Főnök (A Multiplexer, ami irányítja a forgalmat a kontroller és az izmok között)
+        Node(
+            package='my_hexapod',
+            executable='brain_node',
+            name='brain_node',
+            output='screen'
+        ),
+
+        # ---------------------------------------
+
+        # 9. A Foxglove híd
         Node(
             package='foxglove_bridge',
             executable='foxglove_bridge',

@@ -35,7 +35,7 @@ ros2 launch my_hexapod display.launch.
 
 # IP address lekérése:
 -----------------------------------
-hostname -i
+hostname -I
 
 
 REMEMBER.
