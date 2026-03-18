@@ -14,10 +14,6 @@ ros2 run my_hexapod *name of the node*
 -----------------------------------
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 
-#Basic joystick input
------------------------------------
-ros2 run teleop_twist_joy teleop_node --ros-args -p axis_linear.x:=1 -p axis_linear.y:=0 -p axis_angular.yaw:=3 -p require_enable_button:=false
-
 # Nézzük meg, hány robot_node fut valójában
 -----------------------------------
 ps aux | grep robot_node
@@ -35,8 +31,36 @@ ros2 launch my_hexapod display.launch.
 
 # IP address lekérése:
 -----------------------------------
-hostname -I
+hostname -i
 
+# Kamera indítása:
+-----------------------------------
+sudo modprobe v4l2loopback video_nr=50 exclusive_caps=1 card_label="HexaCam"
+nohup rpicam-vid -t 0 --width 640 --height 480 --framerate 30 --codec mjpeg -o - | ffmpeg -f mjpeg -i - -pix_fmt yuyv422 -f v4l2 /dev/video50 > /dev/null 2>&1 &
+
+# Kamera tesztelése hogy fut-el:
+-----------------------------------
+ps aux | grep rpicam-vid
+
+# Kamera kinyírása:
+-----------------------------------
+sudo pkill -f rpicam-vid
+sudo pkill -f ffmpeg
+
+# Docker image fordítása
+-----------------------------------
+docker build -t hexapod_ai_os .
+
+# Docker pack futtatása teszthez:
+-----------------------------------
+docker run -it --rm \
+  --name hexapod_brain \
+  --privileged \
+  --network host \
+  -v /dev:/dev \
+  -v ~/hexapod_workspace:/ros_ws \
+  hexapod_ai_os \
+  bash
 
 REMEMBER.
 A servok telepítéséhez valami trükk kell

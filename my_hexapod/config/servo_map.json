@@ -11,13 +11,13 @@
         "joint_2_femur": { "board": 65, "pin": 5, "center": 90, "offset": 20,  "dir": -1 },
         "joint_2_tibia": { "board": 65, "pin": 6, "center": 25, "offset": 0,   "dir": 1 },
 
-        "joint_3_coxa":  { "board": 64, "pin": 12, "center": 90, "offset": 0, "dir": -1 },
-        "joint_3_femur": { "board": 64, "pin": 13, "center": 90, "offset": 20,  "dir": -1 },
-        "joint_3_tibia": { "board": 64, "pin": 14, "center": 25, "offset": 0,  "dir": 1 },
+        "joint_3_coxa":  { "board": 65, "pin": 12, "center": 160, "offset": 0, "dir": 1 },
+        "joint_3_femur": { "board": 65, "pin": 13, "center": 90, "offset": 20,  "dir": -1 },
+        "joint_3_tibia": { "board": 65, "pin": 14, "center": 25, "offset": -90,  "dir": 1 },
 
-        "joint_4_coxa":  { "board": 65, "pin": 14, "center": 90, "offset": 0,   "dir": 1 },
-        "joint_4_femur": { "board": 65, "pin": 13, "center": 90, "offset": 20,  "dir": -1 },
-        "joint_4_tibia": { "board": 65, "pin": 12, "center": 25, "offset": 0,   "dir": 1 },
+        "joint_4_coxa":  { "board": 64, "pin": 14, "center": 90, "offset": 0,   "dir": -1 },
+        "joint_4_femur": { "board": 64, "pin": 15, "center": 90, "offset": 20,  "dir": -1 },
+        "joint_4_tibia": { "board": 64, "pin": 13, "center": 25, "offset": 0,   "dir": 1 },
 
         "joint_5_coxa":  { "board": 64, "pin": 4, "center": 90, "offset": 0,   "dir": -1 },
         "joint_5_femur": { "board": 64, "pin": 5, "center": 90, "offset": 20,  "dir": -1 },

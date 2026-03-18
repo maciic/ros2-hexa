@@ -22,11 +22,11 @@ class PS5MapperNode(Node):
         self.BUTTON_MAP = {
             0: "CROSS",     # X (Stop)
             1: "CIRCLE",    # Kör (Integetés)
-            2: "TRIANGLE",  
-            3: "SQUARE",    # Négyzet (Támadás)
-            4: "L1",        # <--- EZT FELEJTETTEM EL! (Tripod)
-            5: "R1",        # <--- ÉS EZT IS! (Ripple)
-            9: "OPTIONS",   # AI
+            2: "SQUARE",    # Négyzet (Támadás)
+            3: "TRIANGLE",    
+            9: "L1",        # <--- EZT FELEJTETTEM EL! (Tripod)
+            10: "R1",        # <--- ÉS EZT IS! (Ripple)
+            6: "OPTIONS",   # AI
             13: "DPAD_UP",  
             14: "DPAD_DOWN" 
         }
@@ -55,7 +55,7 @@ class PS5MapperNode(Node):
         # Általában axes[1] a bal fel/le, axes[0] a bal jobbra/balra, axes[3] a jobb jobbra/balra
         twist.linear.x = msg.axes[1]   # Előre/Hátra
         twist.linear.y = msg.axes[0]   # Oldalazás
-        twist.angular.z = msg.axes[3]  # Forgás (Yaw)
+        twist.angular.z = msg.axes[2]  # Forgás (Yaw)
         
         # --- 3. EXTRA: TESTMAGASSÁG A RAVASZOKKAL (L2 / R2) ---
         # A ravaszok (axes 2 és 5) értéke 1.0 (kiengedve) és -1.0 (behúzva) között mozog.
