@@ -3,28 +3,32 @@
     "min_pulse": 500,
     "max_pulse": 2500,
     "servos": {
-        "joint_1_coxa":  { "board": 65, "pin": 0, "center": 90, "offset": 0,  "dir": -1 },
-        "joint_1_femur": { "board": 65, "pin": 1, "center": 90, "offset": 20,  "dir": -1 },
-        "joint_1_tibia": { "board": 65, "pin": 2, "center": 25, "offset": 0,   "dir": 1 },
+        "joint_1_coxa":  { "board": 65, "pin": 0, "center": 90, "offset": 0,    "dir": -1 , "scale": 1.0},
+        "joint_1_femur": { "board": 65, "pin": 1, "center": 80, "offset": 12,    "dir": -1, "scale": 0.9 },
+        "joint_1_tibia": { "board": 65, "pin": 2, "center": 25, "offset": 0,    "dir": 1, "scale": 1.0 },
 
-        "joint_2_coxa":  { "board": 65, "pin": 4, "center": 90, "offset": 0,  "dir": -1 },
-        "joint_2_femur": { "board": 65, "pin": 5, "center": 90, "offset": 20,  "dir": -1 },
-        "joint_2_tibia": { "board": 65, "pin": 6, "center": 25, "offset": 0,   "dir": 1 },
+        "joint_2_coxa":  { "board": 65, "pin": 4, "center": 90, "offset": 5,    "dir": -1, "scale": 1.0 },
+        "joint_2_femur": { "board": 65, "pin": 5, "center": 80, "offset": 20,   "dir": -1, "scale": 0.9 },
+        "joint_2_tibia": { "board": 65, "pin": 6, "center": 25, "offset": -5,    "dir": 1, "scale": 1.0 },
 
-        "joint_3_coxa":  { "board": 65, "pin": 12, "center": 160, "offset": 0, "dir": 1 },
-        "joint_3_femur": { "board": 65, "pin": 13, "center": 90, "offset": 20,  "dir": -1 },
-        "joint_3_tibia": { "board": 65, "pin": 14, "center": 25, "offset": -90,  "dir": 1 },
+        "joint_3_coxa":  { "board": 64, "pin": 12, "center": 90, "offset": 0,   "dir": -1, "scale": 1.0 },
+        "joint_3_femur": { "board": 64, "pin": 13, "center": 80, "offset": 15,  "dir": -1, "scale": 0.85 },
+        "joint_3_tibia": { "board": 64, "pin": 14, "center": 25, "offset": -10,   "dir": 1, "scale": 1.0 },
 
-        "joint_4_coxa":  { "board": 64, "pin": 14, "center": 90, "offset": 0,   "dir": -1 },
-        "joint_4_femur": { "board": 64, "pin": 15, "center": 90, "offset": 20,  "dir": -1 },
-        "joint_4_tibia": { "board": 64, "pin": 13, "center": 25, "offset": 0,   "dir": 1 },
+        "joint_4_coxa":  { "board": 65, "pin": 12, "center": 90, "offset": 0,   "dir": -1, "scale": 1.0 },
+        "joint_4_femur": { "board": 65, "pin": 13, "center": 80, "offset": 20,  "dir": -1, "scale": 1.0 },
+        "joint_4_tibia": { "board": 65, "pin": 14, "center": 25, "offset": 0,   "dir": 1, "scale": 1.0 },
 
-        "joint_5_coxa":  { "board": 64, "pin": 4, "center": 90, "offset": 0,   "dir": -1 },
-        "joint_5_femur": { "board": 64, "pin": 5, "center": 90, "offset": 20,  "dir": -1 },
-        "joint_5_tibia": { "board": 64, "pin": 6, "center": 25, "offset": 0,   "dir": 1 },
+        "joint_5_coxa":  { "board": 64, "pin": 4, "center": 90, "offset": -10,  "dir": -1, "scale": 1.0 },
+        "joint_5_femur": { "board": 64, "pin": 5, "center": 80, "offset": 20,   "dir": -1, "scale": 0.8 },
+        "joint_5_tibia": { "board": 64, "pin": 6, "center": 25, "offset": -10,    "dir": 1, "scale": 1.0 },
 
-        "joint_6_coxa":  { "board": 64, "pin": 0, "center": 90, "offset": 0,   "dir": -1 },
-        "joint_6_femur": { "board": 64, "pin": 1, "center": 90, "offset": 20,  "dir": -1 }, 
-        "joint_6_tibia": { "board": 64, "pin": 2, "center": 25, "offset": 0,  "dir": 1 }
+        "joint_6_coxa":  { "board": 64, "pin": 0, "center": 90, "offset": -5,   "dir": -1, "scale": 1.0 },
+        "joint_6_femur": { "board": 64, "pin": 1, "center": 80, "offset": 25,   "dir": -1, "scale": 1.0 }, 
+        "joint_6_tibia": { "board": 64, "pin": 2, "center": 25, "offset": -2,    "dir": 1, "scale": 1.0 }
+    },
+    
+    "nothing": {
+        
     }
 }

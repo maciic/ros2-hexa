@@ -6,8 +6,6 @@ ros2 launch my_hexapod display.launch.py
 
 #Egyetlen node futtatása
 -----------------------------------
-colcon build --packages-select my_hexapod
-source install/setup.bash
 ros2 run my_hexapod *name of the node*
 
 #Keyboard input thingy

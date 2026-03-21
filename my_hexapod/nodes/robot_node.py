@@ -192,9 +192,22 @@ class HexapodController(Node):
         elif main_state == "ANIM":
             self.gait.current_state = "ANIMATION"
             self.gait.active_animation = sub_state
-        else: # IDLE
-            self.gait.current_state = "IDLE"
-            self.gait.active_animation = None
+        else: # IDLE parancs érkezett az Agytól
+            
+            # ÚJ: Ellenőrizzük, hogy a robot fizikailag megállt-e már!
+            is_moving = (abs(self.current_vel['x']) > 0.1 or 
+                         abs(self.current_vel['y']) > 0.1 or 
+                         abs(self.current_vel['yaw']) > 0.1)
+            
+            if is_moving:
+                # Bár az Agy IDLE-t kért, a test még lendületben van (lassul).
+                # Maradunk WALK módban, hogy a lábak szépen befejezzék a lépést!
+                self.gait.current_state = "WALK"
+                # A self.gait.gait_mode-ot békén hagyjuk, így az előző járásmód folyik tovább
+            else:
+                # Most már tényleg megállt a sebesség. Jöhet a tényleges IDLE (pl. lélegzés).
+                self.gait.current_state = "IDLE"
+                self.gait.active_animation = None
             
         # Lekérjük a test dőlését és magasságát az aktuális állapot szerint
         self.body_rpy, self.breathe_z, self.anim_leg_offsets = self.gait.get_body_pose(t)

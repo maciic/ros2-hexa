@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
+import time
 
 class HexapodBrainNode(Node):
     def __init__(self):
@@ -73,9 +74,9 @@ class HexapodBrainNode(Node):
         # Ha épp animációt játszunk, nem engedjük a sétát. Csak a STOP gomb szakíthatja meg.
         if self.current_state != "ANIMATION":
             # Van mozgás parancs a karokon? (Deadzone ellenőrzés)
-            if abs(current_input_vel.linear.x) > 0.05 or \
-               abs(current_input_vel.linear.y) > 0.05 or \
-               abs(current_input_vel.angular.z) > 0.05:
+            if abs(current_input_vel.linear.x) > 0.1 or \
+               abs(current_input_vel.linear.y) > 0.1 or \
+               abs(current_input_vel.angular.z) > 0.1:
                 self.current_state = "WALK"
             else:
                 self.current_state = "IDLE"

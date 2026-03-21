@@ -38,6 +38,7 @@ setup(
             'ps5_mapper = my_hexapod.nodes.ps5_mapper_node:main', # PS5 kontroller leképezése a robot parancsaira
             'brain_node = my_hexapod.nodes.brain_node:main', # Az agy, ami a vezérlő
             'ai_vision_node = my_hexapod.nodes.ai_vision_node:main', # A szem, ami látja a világot
+            'calibration_node = my_hexapod.nodes.calibration_node:main', # A kalibráló, ami segít beállítani a szervókat
         ],
     },
 )
