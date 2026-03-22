@@ -60,7 +60,7 @@ class PS5MapperNode(Node):
         # --- 3. EXTRA: TESTMAGASSÁG A RAVASZOKKAL (L2 / R2) ---
         # A ravaszok (axes 2 és 5) értéke 1.0 (kiengedve) és -1.0 (behúzva) között mozog.
         # Konvertáljuk át 0.0 és 1.0 közötti értékre:
-        l2_pull = (1.0 - msg.axes[2]) / 2.0  
+        l2_pull = (1.0 - msg.axes[4]) / 2.0  
         r2_pull = (1.0 - msg.axes[5]) / 2.0  
         
         # A Z tengely (magasság) eltolását a Twist üzenet linear.z mezőjébe tesszük bele.

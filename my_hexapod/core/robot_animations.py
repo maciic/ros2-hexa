@@ -23,7 +23,7 @@ class HexapodAnimations:
             # A kört 6 egyenlő részre osztjuk (60 fokos, azaz pi/3 csúsztatások)
             order = {"leg_1": 0, "leg_2": 1, "leg_3": 2, "leg_6": 3, "leg_5": 4, "leg_4": 5}
             idx = order.get(leg_key, 0)
-            phase_offset = idx * (math.pi / 3.0)
+            phase_offset = idx * (math.pi / 1.0)
             
         return phase_offset
 
@@ -33,9 +33,9 @@ class HexapodAnimations:
         """ 1. ÁLLAPOT: Alap lélegzés (Ha a robot áll és nem csinál semmit) """
         cycle_time = 3.0
         t_cycle = t % cycle_time
-        breathe_z = math.sin((t_cycle / 2.0) * math.pi) * -15.0 if t_cycle < 2.0 else 0.0
+        breathe_z = math.sin((t_cycle / 2.0) * math.pi) * 0.0 if t_cycle < 2.0 else 0.0
         
-        body_rpy = {'roll': 0.0, 'pitch': math.radians(-5.0), 'yaw': 0.0}
+        body_rpy = {'roll': 0.0, 'pitch': math.radians(0.0), 'yaw': 0.0}
         return body_rpy, breathe_z, {} # A {} az üres láb-felülírás (senki sem integet)
 
     def get_attack_pose(self, t):
@@ -57,9 +57,9 @@ class HexapodAnimations:
         breathe_z = 0.0
         
         # Integető matek a jobb első lábnak
-        wave_speed = 6.0  # Milyen gyorsan integessen
-        wave_y = math.sin(t * wave_speed) * 40.0 # Jobbra-balra lengetés 40mm-en
-        wave_z = -80.0 # Emelje fel a lábát 80mm-re a földtől
+        wave_speed = 6.0 
+        wave_y = math.sin(t * wave_speed) * 40.0 
+        wave_z = 80.0 # <--- POZITÍV 80, hogy felfelé emelkedjen!
         
         # Ezt a parancsot az inverz kinematika csak az 1-es lábra fogja rátolni!
         leg_offsets = {

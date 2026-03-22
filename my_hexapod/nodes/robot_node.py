@@ -12,6 +12,9 @@ import os
 # === IMPORTÁLJUK A MODULOKAT ===
 from my_hexapod.core.robot_kinematics import HexapodKinematics 
 from my_hexapod.core.robot_gait import HexapodGait 
+from geometry_msgs.msg import PointStamped, Point
+from visualization_msgs.msg import Marker
+from std_msgs.msg import ColorRGBA
 
 class HexapodController(Node):
     def __init__(self):
@@ -32,8 +35,8 @@ class HexapodController(Node):
         self.gait = HexapodGait()
 
         # 3. ÁLLAPOTVÁLTOZÓK
-        self.cmd_vel = {'x': 0.0, 'y': 0.0, 'yaw': 0.0}
-        self.current_vel = {'x': 0.0, 'y': 0.0, 'yaw': 0.0}
+        self.cmd_vel = {'x': 0.0, 'y': 0.0, 'z': 0.0, 'yaw': 0.0}
+        self.current_vel = {'x': 0.0, 'y': 0.0, 'z': 0.0, 'yaw': 0.0}
         self.ramp_step = 0.02  #Gyorsulás lépésenként (0.01 = 1% gyorsulás minden ciklusban)
         
         self.body_rpy = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}
@@ -47,10 +50,10 @@ class HexapodController(Node):
         self.declare_parameters(
             namespace='',
             parameters=[
-                ('gait_freq', 1.0),
-                ('gait_step_len', 100.0),
-                ('gait_step_height', 40.0),
-                ('gait_base_dist', 250.0),
+                ('gait_freq', 1.4),
+                ('gait_step_len', 120.0),
+                ('gait_step_height', 80.0),
+                ('gait_base_dist', 280.0),
                 ('gait_base_height', -100.0)
             ]
         )
@@ -74,6 +77,12 @@ class HexapodController(Node):
         # --- ÚJ: Már nem az animációkat, hanem a tiszta robot_state-et figyeljük az Agytól! ---
         self.state_sub = self.create_subscription(String, 'robot_state', self.state_callback, 10) 
         
+        # Célpont publikáló a Foxglove-hoz (az 1-es lábhoz)
+        self.leg_target_pub = self.create_publisher(PointStamped, 'debug/leg_1_target', 10)
+        
+        # ÚJ: Lábvégek (mancsok) publikálása a Foxglove 3D-hez
+        self.foot_tips_pub = self.create_publisher(Marker, 'debug/foot_tips', 10)
+        
         self.timer = self.create_timer(1.0 / 50.0, self.timer_callback)
         self.start_time = time.time()
         
@@ -82,6 +91,7 @@ class HexapodController(Node):
     def cmd_vel_callback(self, msg):
         self.cmd_vel['x'] = msg.linear.x
         self.cmd_vel['y'] = msg.linear.y
+        self.cmd_vel['z'] = msg.linear.z  # <--- ÚJ
         self.cmd_vel['yaw'] = msg.angular.z
         
     def parameters_callback(self, params):
@@ -160,12 +170,15 @@ class HexapodController(Node):
         )
 
         # 2. Kiszámoljuk a szögeket
-        return self.kinematics.compute_ik(lx, ly, lz)
+        # 2. Kiszámoljuk a szögeket
+        angles = self.kinematics.compute_ik(lx, ly, lz)
+        return angles, global_pos
 
     def timer_callback(self):
         # 1. Ramping (A szervók mechanikai kímélése)
         self.current_vel['x'] = self.ramp_value(self.current_vel['x'], self.cmd_vel['x'], self.ramp_step)
         self.current_vel['y'] = self.ramp_value(self.current_vel['y'], self.cmd_vel['y'], self.ramp_step)
+        self.current_vel['z'] = self.ramp_value(self.current_vel['z'], self.cmd_vel['z'], self.ramp_step)
         self.current_vel['yaw'] = self.ramp_value(self.current_vel['yaw'], self.cmd_vel['yaw'], self.ramp_step)
 
         # 2. Debug Pub
@@ -178,6 +191,9 @@ class HexapodController(Node):
         # 3. ENGEDELMESKEDÉS A FŐNÖKNEK (Nincs több találgatás a sebességből!)
         now = time.time()
         t = now - self.start_time
+        
+        base_h = self.get_parameter('gait_base_height').value
+        self.gait.params['base_height'] = base_h + self.current_vel['z']
         
         # Szétszedjük a parancsot (pl: "WALK_RIPPLE" -> main: "WALK", sub: "RIPPLE")
         state_parts = self.robot_state_str.split('_', 1)
@@ -212,12 +228,47 @@ class HexapodController(Node):
         # Lekérjük a test dőlését és magasságát az aktuális állapot szerint
         self.body_rpy, self.breathe_z, self.anim_leg_offsets = self.gait.get_body_pose(t)
 
-        # 4. Lábak mozgatása
+        # 4. Marker üzenet előkészítése (a lábvégeknek)
+        marker_msg = Marker()
+        marker_msg.header.stamp = self.get_clock().now().to_msg()
+        marker_msg.header.frame_id = "base_link"  # Robot központi frame
+        marker_msg.ns = "foot_tips"
+        marker_msg.id = 0
+        marker_msg.type = Marker.SPHERE_LIST # Egy lista gömbökből (pöttyökből)
+        marker_msg.action = Marker.ADD
+        marker_msg.pose.orientation.w = 1.0 # Alap orientation
+
+        # Pöttyök mérete (mm helyett méterben: 1.5 cm átmérőjű gömbök)
+        marker_msg.scale.x = 0.015
+        marker_msg.scale.y = 0.015
+        marker_msg.scale.z = 0.015
+
+        # Pöttyök alap színe (például élénk zöld, teljes átlátszatlansággal)
+        default_color = ColorRGBA()
+        default_color.r = 0.0
+        default_color.g = 1.0
+        default_color.b = 0.0
+        default_color.a = 1.0
+
+        # --- Lábak feldolgozása és koordináták begyűjtése ---
         all_joints = {}
         for leg_key, leg_cfg in self.LEGS.items():
-            coxa, femur, tibia = self.process_leg(leg_key, leg_cfg, t)
-            all_joints[leg_key] = [coxa, femur, tibia]
+            # Most már a process_leg visszaadja az angles mellett a global_pos-t is (az előző lépés miatt)
+            angles, global_pos = self.process_leg(leg_key, leg_cfg, t)
+            all_joints[leg_key] = angles
 
+            # Pont hozzáadása a Marker listához (mm -> méter konverzióval)
+            p = Point()
+            p.x = global_pos[0] / 1000.0
+            p.y = global_pos[1] / 1000.0
+            p.z = global_pos[2] / 1000.0
+            marker_msg.points.append(p)
+
+            # Szín hozzáadása (mindegyik láb ugyanazt a zöld színt kapja)
+            marker_msg.colors.append(default_color)
+
+        # 5. Publikálás
+        self.foot_tips_pub.publish(marker_msg)
         self.publish_joints_all(all_joints)
 
     # ... PUBLISHEREK ...

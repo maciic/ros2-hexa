@@ -168,14 +168,14 @@ class ServoNode(Node):
             # ==========================================================
             sit_targets_deg = {
                 'coxa': 90.0, 
-                'femur': 5.0,  
-                'tibia': 130.0    
+                'femur': 0.0,  
+                'tibia': 135.0    
             }
             
             # Átváltjuk a célokat ROS radián eltérésre a háttérben (90 a 0.0 radián)
             sit_targets_rad = {
                 'coxa': math.radians(sit_targets_deg['coxa'] - 90.0),
-                'femur': math.radians(sit_targets_deg['femur'] - 80.0),
+                'femur': math.radians(sit_targets_deg['femur'] - 90.0),
                 'tibia': math.radians(sit_targets_deg['tibia'] - 25.0)
             }
             
