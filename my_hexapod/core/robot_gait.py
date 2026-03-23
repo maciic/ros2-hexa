@@ -70,8 +70,14 @@ class HexapodGait:
         turn_amp = (self.params['step_len'] / 2.0) * vel_yaw
 
         # Mennyi időt tölt a láb a földön? (pushFraction)
-        # Tripodnál a ciklus felét (0.5) tölti a földön, Ripple-nél kicsit többet (pl. 0.66)
-        push_fraction = 0.5 if self.gait_mode == "TRIPOD" else 0.66
+        if self.gait_mode == "TRIPOD":
+            push_fraction = 3.1 / 6.0  # ~51% a földön
+        elif self.gait_mode == "RIPPLE":
+            push_fraction = 4.2 / 6.0  # ~70% a földön
+        elif self.gait_mode == "WAVE":
+            push_fraction = 4.9 / 6.0  # ~82% a földön (Lassú stabil járás)
+        else:
+            push_fraction = 0.5
 
         # Fázis (0-2PI) normalizálása 0.0 és 1.0 közötti 't' idővé
         t = (phase % (2 * math.pi)) / (2 * math.pi)

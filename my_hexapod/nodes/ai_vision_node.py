@@ -1,6 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 import cv2
 
 class AIVisionNode(Node):
@@ -10,89 +12,87 @@ class AIVisionNode(Node):
         # 1. PUBLISHER a Főnök felé
         self.cmd_pub = self.create_publisher(Twist, 'cmd_vel_ai', 10)
         
-        # 2. KAMERA INDÍTÁSA
-        self.cap = cv2.VideoCapture(0) # A /dev/video0 kamera megnyitása
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        # 2. FELIRATKOZÁS A KAMERÁRA (Queue size 1-re csökkentve!)
+        self.subscription = self.create_subscription(Image, 'image_raw', self.image_callback, 1)
+        self.bridge = CvBridge() 
         
-        # 3. IDEIGLENES FELISMERŐ MOTOR (Amíg a Hailo modellt be nem kötjük)
+        # ÚJ: Egy flag, hogy épp dolgozunk-e
+        self.is_processing = False
+        
+        # 3. IDEIGLENES FELISMERŐ MOTOR
         self.hog = cv2.HOGDescriptor()
         self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
         
-        # 4. SZABÁLYOZÓ MATEK (PID) BEÁLLÍTÁSAI
-        self.center_x = 320 # A 640-es képernyő közepe
-        self.target_width = 150 # Milyen "széles" legyen az ember (Távolságtartás)
+        # 4. SZABÁLYOZÓ MATEK
+        self.center_x = 320 
+        self.target_width = 150 
+        self.kp_yaw = 0.002  
+        self.kp_linear = 0.005 
         
-        self.kp_yaw = 0.002  # Forgás érzékenysége
-        self.kp_linear = 0.005 # Előre-hátra séta érzékenysége
-        
-        # 5. CIKLUS INDÍTÁSA (10 Hz, hogy a CPU bírja az ideiglenes tesztet)
-        self.timer = self.create_timer(0.1, self.process_frame)
-        
-        self.get_logger().info("👁️ AI Látókéreg online! Keresem a gazdát...")
+        self.get_logger().info("👁️ AI Látókéreg online! Várom a képeket a kamerától...")
 
-    def process_frame(self):
-        ret, frame = self.cap.read()
-        if not ret:
-            self.get_logger().error("Nem kapok képet a kamerától!")
+    def image_callback(self, msg):
+        # --- 1. Frame eldobása, ha az AI épp egy korábbi képen izzad ---
+        if getattr(self, 'is_processing', False):
             return
-
-        # Ember keresése a képen (Később itt fogjuk meghívni a Hailo-t!)
-        # A detectMultiScale visszaadja a dobozokat: (x, y, szélesség, magasság)
-        boxes, weights = self.hog.detectMultiScale(frame, winStride=(8,8), padding=(8, 8), scale=1.05)
-        
-        ai_cmd = Twist()
-
-        if len(boxes) > 0:
-            # Ha látunk embert, kiválasztjuk az elsőt (a legnagyobbat)
-            x, y, w, h = boxes[0]
             
-            # Doboz közepének kiszámítása
-            box_center_x = x + (w / 2)
-            
-            # --- 1. FORGÁSI LOGIKA (YAW) ---
-            # Mennyire van messze a doboz közepe a képernyő közepétől?
-            error_yaw = self.center_x - box_center_x 
-            ai_cmd.angular.z = error_yaw * self.kp_yaw
-            
-            # --- 2. TÁVOLSÁG LOGIKA (LINEAR X) ---
-            # Mennyire széles az ember a célhoz képest?
-            error_linear = self.target_width - w
-            ai_cmd.linear.x = error_linear * self.kp_linear
-            
-            # Limitáljuk a maximális sebességeket, nehogy elszálljon a robot
-            ai_cmd.angular.z = max(min(ai_cmd.angular.z, 0.5), -0.5)
-            ai_cmd.linear.x = max(min(ai_cmd.linear.x, 0.5), -0.5)
+        # Zároljuk a bemenetet: mostantól mi dolgozunk!
+        self.is_processing = True
 
-            # Terminálos Vizuális Teszt (Mivel nincs monitorunk)
-            irany = "BALRA ⬅️" if ai_cmd.angular.z > 0 else "JOBBRA ➡️" if ai_cmd.angular.z < 0 else "KÖZÉPEN 🎯"
-            tav = "ELŐRE ⬆️" if ai_cmd.linear.x > 0 else "HÁTRA ⬇️" if ai_cmd.linear.x < 0 else "ÁLL 🛑"
+        try:
+            # A TELJES KORÁBBI LOGIKA ITT VAN BENT (egy tabbal beljebb húzva)
             
-            self.get_logger().info(
-                f"LÁTOK VALAKIT! [Közép: {box_center_x:.0f}, Szélesség: {w}] -> "
-                f"Forgás: {irany} ({ai_cmd.angular.z:.2f}), Séta: {tav} ({ai_cmd.linear.x:.2f})"
-            )
-        else:
-            # Ha nem látunk senkit, a robot megáll (vagy körbeforoghatna keresve)
-            self.get_logger().info("Senki nincs a képen... 😴")
+            # Kép átalakítása
+            frame = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            frame = cv2.resize(frame, (640, 480))
 
-        # Parancs kiküldése az Agynak
-        self.cmd_pub.publish(ai_cmd)
+            # Ember keresése
+            boxes, weights = self.hog.detectMultiScale(frame, winStride=(8,8), padding=(8, 8), scale=1.05)
+            
+            ai_cmd = Twist()
 
-    def destroy_node(self):
-        self.cap.release()
-        super().destroy_node()
+            if len(boxes) > 0:
+                x, y, w, h = boxes[0]
+                box_center_x = x + (w / 2)
+                
+                error_yaw = self.center_x - box_center_x 
+                ai_cmd.angular.z = error_yaw * self.kp_yaw
+                
+                error_linear = self.target_width - w
+                ai_cmd.linear.x = error_linear * self.kp_linear
+                
+                ai_cmd.angular.z = max(min(ai_cmd.angular.z, 0.5), -0.5)
+                ai_cmd.linear.x = max(min(ai_cmd.linear.x, 0.5), -0.5)
+
+                irany = "BALRA ⬅️" if ai_cmd.angular.z > 0 else "JOBBRA ➡️" if ai_cmd.angular.z < 0 else "KÖZÉPEN 🎯"
+                tav = "ELŐRE ⬆️" if ai_cmd.linear.x > 0 else "HÁTRA ⬇️" if ai_cmd.linear.x < 0 else "ÁLL 🛑"
+                
+                self.get_logger().info(
+                    f"LÁTOK VALAKIT! [Közép: {box_center_x:.0f}, Szélesség: {w}] -> "
+                    f"Forgás: {irany}, Séta: {tav}"
+                )
+            else:
+                self.get_logger().info("Senki nincs a képen... 😴")
+
+            # Parancs kiküldése az Agynak
+            self.cmd_pub.publish(ai_cmd)
+
+        except Exception as e:
+            # Ha bármi elszállna feldolgozás közben, itt elkapjuk
+            self.get_logger().error(f"Hiba a képfeldolgozás során: {e}")
+            
+        finally:
+            # --- 2. ZÁROLÁS FELOLDÁSA ---
+            # Ez a rész MINDIG lefut, akár volt hiba, akár sikeres volt a felismerés.
+            # Jöhet a következő legfrissebb képkocka!
+            self.is_processing = False
 
 def main(args=None):
     rclpy.init(args=args)
     node = AIVisionNode()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

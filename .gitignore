@@ -13,3 +13,13 @@ log/
 
 # Windows fájlok
 *:Zone.Identifier
+
+# AI Models and Weights
+*.hef
+*.onnx
+*.weights
+*.pt
+
+# Media and Logs
+*.mp4
+*.jpg

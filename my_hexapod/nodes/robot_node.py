@@ -37,7 +37,7 @@ class HexapodController(Node):
         # 3. ÁLLAPOTVÁLTOZÓK
         self.cmd_vel = {'x': 0.0, 'y': 0.0, 'z': 0.0, 'yaw': 0.0}
         self.current_vel = {'x': 0.0, 'y': 0.0, 'z': 0.0, 'yaw': 0.0}
-        self.ramp_step = 0.02  #Gyorsulás lépésenként (0.01 = 1% gyorsulás minden ciklusban)
+        self.ramp_step = 0.05  #Gyorsulás lépésenként (0.01 = 1% gyorsulás minden ciklusban)
         
         self.body_rpy = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}
         self.breathe_z = 0.0
@@ -178,7 +178,7 @@ class HexapodController(Node):
         # 1. Ramping (A szervók mechanikai kímélése)
         self.current_vel['x'] = self.ramp_value(self.current_vel['x'], self.cmd_vel['x'], self.ramp_step)
         self.current_vel['y'] = self.ramp_value(self.current_vel['y'], self.cmd_vel['y'], self.ramp_step)
-        self.current_vel['z'] = self.ramp_value(self.current_vel['z'], self.cmd_vel['z'], self.ramp_step)
+        self.current_vel['z'] = self.ramp_value(self.current_vel['z'], self.cmd_vel['z'], self.ramp_step) 
         self.current_vel['yaw'] = self.ramp_value(self.current_vel['yaw'], self.cmd_vel['yaw'], self.ramp_step)
 
         # 2. Debug Pub
@@ -193,7 +193,8 @@ class HexapodController(Node):
         t = now - self.start_time
         
         base_h = self.get_parameter('gait_base_height').value
-        self.gait.params['base_height'] = base_h + self.current_vel['z']
+        z_offset_mm = self.current_vel['z'] * 40.0 
+        self.gait.params['base_height'] = base_h + z_offset_mm
         
         # Szétszedjük a parancsot (pl: "WALK_RIPPLE" -> main: "WALK", sub: "RIPPLE")
         state_parts = self.robot_state_str.split('_', 1)
@@ -211,9 +212,9 @@ class HexapodController(Node):
         else: # IDLE parancs érkezett az Agytól
             
             # ÚJ: Ellenőrizzük, hogy a robot fizikailag megállt-e már!
-            is_moving = (abs(self.current_vel['x']) > 0.1 or 
-                         abs(self.current_vel['y']) > 0.1 or 
-                         abs(self.current_vel['yaw']) > 0.1)
+            is_moving = (abs(self.current_vel['x']) > 0.01 or 
+                         abs(self.current_vel['y']) > 0.01 or 
+                         abs(self.current_vel['yaw']) > 0.01)
             
             if is_moving:
                 # Bár az Agy IDLE-t kért, a test még lendületben van (lassul).

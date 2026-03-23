@@ -4,26 +4,33 @@ class HexapodAnimations:
     def __init__(self):
         pass
 
-    # --- ÚJ: JÁRÁSKOREOGRÁFIÁK (Fáziseltolások) ---
+    # --- JÁRÁSKOREOGRÁFIÁK (Fáziseltolások) ---
     def get_phase_offset(self, gait_mode, leg_key):
-        """ 
-        Visszaadja, hogy az adott lábnak mennyit kell késnie a fő ciklushoz képest.
-        Itt dől el a sorrend! (Tripod vs Ripple)
-        """
+        """ Visszaadja a lábak fáziskésését radiánban (0-tól 2*PI-ig) """
         phase_offset = 0.0
         
         if gait_mode == "TRIPOD":
-            # Tripod csoportosítás
             group_a = ["leg_1", "leg_3", "leg_5"]
             if leg_key not in group_a:
-                phase_offset = math.pi # B csoport ellentétes fázisban
+                phase_offset = math.pi
                 
         elif gait_mode == "RIPPLE":
-            # Óramutató járásával megegyező hullámzó járás (1 -> 2 -> 3 -> 6 -> 5 -> 4)
-            # A kört 6 egyenlő részre osztjuk (60 fokos, azaz pi/3 csúsztatások)
-            order = {"leg_1": 0, "leg_2": 1, "leg_3": 2, "leg_6": 3, "leg_5": 4, "leg_4": 5}
-            idx = order.get(leg_key, 0)
-            phase_offset = idx * (math.pi / 1.0)
+            order = { "leg_1": 0.0, "leg_2": 4.0, "leg_3": 2.0, "leg_4": 5.0, "leg_5": 1.0, "leg_6": 3.0 }
+            idx = order.get(leg_key, 0.0)
+            phase_offset = (idx / 6.0) * (2 * math.pi)
+            
+        elif gait_mode == "WAVE":
+            # <--- ÚJ: Szépen körbemegy a robot körül (1->2->3->6->5->4)
+            order = {
+                "leg_1": 0.0,
+                "leg_2": 1.0,
+                "leg_3": 2.0,
+                "leg_6": 3.0,
+                "leg_5": 4.0,
+                "leg_4": 5.0
+            }
+            idx = order.get(leg_key, 0.0)
+            phase_offset = (idx / 6.0) * (2 * math.pi)
             
         return phase_offset
 

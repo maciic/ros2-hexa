@@ -66,7 +66,7 @@ class PS5MapperNode(Node):
         # A Z tengely (magasság) eltolását a Twist üzenet linear.z mezőjébe tesszük bele.
         # Ha mindkettőt húzod, az érték 0. Ha R2-t húzod (guggol), negatív, L2-vel pozitív.
         # A Z értéket beszorozzuk mondjuk 40 mm-rel, így ez lesz a maximális emelés/süllyesztés.
-        twist.linear.z = (l2_pull - r2_pull) * 40.0 
+        twist.linear.z = (l2_pull - r2_pull)
         
         self.vel_pub.publish(twist)
 
@@ -78,12 +78,14 @@ class PS5MapperNode(Node):
             cmd_msg.data = "ANIM_ATTACK"
         elif btn_name == "CIRCLE":
             cmd_msg.data = "ANIM_WAVE" 
-        elif btn_name == "CROSS":      # <--- EZ HIÁNYZOTT (STOP / Vészfék)
+        elif btn_name == "CROSS":      
             cmd_msg.data = "STOP"
-        elif btn_name == "L1":         # <--- D-PAD HELYETT: Tripod járás
+        elif btn_name == "L1":         
             cmd_msg.data = "GAIT_TRIPOD"
-        elif btn_name == "R1":         # <--- D-PAD HELYETT: Hullámzó (Ripple) járás
+        elif btn_name == "R1":         
             cmd_msg.data = "GAIT_RIPPLE"
+        elif btn_name == "TRIANGLE":
+            cmd_msg.data = "GAIT_WAVE"
         elif btn_name == "OPTIONS":
             cmd_msg.data = "TOGGLE_AI"
         else:
