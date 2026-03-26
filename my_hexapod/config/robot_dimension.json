@@ -3,11 +3,11 @@
         "mesh_package": "package://my_hexapod/meshes"
     },
     "dimensions": {
-        "coxa_length": 46.4,
-        "femur_z_offset": 15.0,
+        "coxa_length": 46.8,
+        "femur_z_offset": 18.8,
         "femur_x": 110.0,
         "femur_drop": 0.0,
-        "tibia_x": 190.0,
+        "tibia_x": 190.6,
         "tibia_drop": 52.4,
         "base_z_offset": 0.0
     },
