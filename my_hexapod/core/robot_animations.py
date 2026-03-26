@@ -4,36 +4,6 @@ class HexapodAnimations:
     def __init__(self):
         pass
 
-    # --- JÁRÁSKOREOGRÁFIÁK (Fáziseltolások) ---
-    def get_phase_offset(self, gait_mode, leg_key):
-        """ Visszaadja a lábak fáziskésését radiánban (0-tól 2*PI-ig) """
-        phase_offset = 0.0
-        
-        if gait_mode == "TRIPOD":
-            group_a = ["leg_1", "leg_3", "leg_5"]
-            if leg_key not in group_a:
-                phase_offset = math.pi
-                
-        elif gait_mode == "RIPPLE":
-            order = { "leg_1": 0.0, "leg_2": 4.0, "leg_3": 2.0, "leg_4": 5.0, "leg_5": 1.0, "leg_6": 3.0 }
-            idx = order.get(leg_key, 0.0)
-            phase_offset = (idx / 6.0) * (2 * math.pi)
-            
-        elif gait_mode == "WAVE":
-            # <--- ÚJ: Szépen körbemegy a robot körül (1->2->3->6->5->4)
-            order = {
-                "leg_1": 0.0,
-                "leg_2": 1.0,
-                "leg_3": 2.0,
-                "leg_6": 3.0,
-                "leg_5": 4.0,
-                "leg_4": 5.0
-            }
-            idx = order.get(leg_key, 0.0)
-            phase_offset = (idx / 6.0) * (2 * math.pi)
-            
-        return phase_offset
-
     # --- ANIMÁCIÓK ÉS PÓZOK ---
 
     def get_idle_breathing(self, t):
@@ -43,19 +13,13 @@ class HexapodAnimations:
         breathe_z = math.sin((t_cycle / 2.0) * math.pi) * 0.0 if t_cycle < 2.0 else 0.0
         
         body_rpy = {'roll': 0.0, 'pitch': math.radians(0.0), 'yaw': 0.0}
-        return body_rpy, breathe_z, {} # A {} az üres láb-felülírás (senki sem integet)
+        return body_rpy, breathe_z, {} 
 
     def get_attack_pose(self, t):
-        """ 2. ÁLLAPOT: Harci póz némi fenékrázással és zihálással (készül a támadásra) """
-        # Szinuszos "farokcsóválás" (Yaw forgás) az idő függvényében
+        """ 2. ÁLLAPOT: Harci póz némi fenékrázással és zihálással """
         wag_yaw = math.sin(t * 15.0) * math.radians(2.0)
-        
-        # Szinuszos "zihálás" (fel-le mozgás Z tengelyen)
         breathe_z = 20.0 + math.sin(t * 5.0) * 5.0 
-        
-        # Bedöntjük -15 fokkal, és rátesszük a farokcsóválást
         body_rpy = {'roll': 0.0, 'pitch': math.radians(-15.0), 'yaw': wag_yaw}
-        
         return body_rpy, breathe_z, {}
 
     def get_wave_pose(self, t):
@@ -63,14 +27,12 @@ class HexapodAnimations:
         body_rpy = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}
         breathe_z = 0.0
         
-        # Integető matek a jobb első lábnak
         wave_speed = 6.0 
-        wave_y = math.sin(t * wave_speed) * 40.0 
-        wave_z = 80.0 # <--- POZITÍV 80, hogy felfelé emelkedjen!
+        wave_y = math.sin(t * wave_speed) * 70.0 
+        wave_z = 300.0
         
-        # Ezt a parancsot az inverz kinematika csak az 1-es lábra fogja rátolni!
         leg_offsets = {
-            'leg_1': {'x': 40.0, 'y': wave_y, 'z': wave_z} 
+            'leg_1': {'x': 60.0, 'y': wave_y, 'z': wave_z} 
         }
         
         return body_rpy, breathe_z, leg_offsets

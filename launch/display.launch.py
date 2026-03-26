@@ -52,8 +52,8 @@ def generate_launch_description():
         # 5. Contact / Szenzor node
         Node(
             package='my_hexapod',
-            executable='contact_node',
-            name='contact_node',
+            executable='ai_vision_node',
+            name='ai_vision_node',
             output='screen'
         ),
 

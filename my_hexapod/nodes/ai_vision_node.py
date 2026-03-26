@@ -1,55 +1,57 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import Image
+from std_msgs.msg import String
+from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
-import time
+import os
 from contextlib import ExitStack
 
-# --- ÚJ: HAILO IMPORTOK ---
 from hailo_platform import (HEF, VDevice, HailoStreamInterface, ConfigureParams,
                             InputVStreamParams, OutputVStreamParams, FormatType, InferVStreams)
+
+# Importáljuk az ÚJ Állapotgépet!
+from my_hexapod.core.ai_state_machine import AIStateMachine
 
 class AIVisionNode(Node):
     def __init__(self):
         super().__init__('ai_vision_node')
         
-        # 1. PUBLISHER a Főnök felé
         self.cmd_pub = self.create_publisher(Twist, 'cmd_vel_ai', 10)
+        self.cmd_str_pub = self.create_publisher(String, 'robot_command', 10)
+        self.image_pub = self.create_publisher(CompressedImage, 'ai_vision_overlay/compressed', 1)
         
-        # 2. FELIRATKOZÁS A KAMERÁRA
-        # Itt maradhat a sima image_raw, mert a konténeren belül vagyunk, nem kell a hálózaton átmennie!
-        self.subscription = self.create_subscription(Image, 'image_raw', self.image_callback, 1)
+        self.image_sub = self.create_subscription(Image, 'image_raw', self.image_callback, 1)
+        self.mode_sub = self.create_subscription(String, 'ai_current_mode', self.mode_callback, 10)
+        
         self.bridge = CvBridge() 
         self.is_processing = False 
+        self.current_ai_mode = "STANDBY"
         
-        # 3. SZABÁLYOZÓ MATEK (A paramétereket a YOLO 640x640-es felbontásához igazítottuk)
-        self.center_x = 320 
-        self.target_width = 250 # Kicsit nagyobbra vettem, mert a YOLO pontosabb dobozt rajzol
-        self.kp_yaw = 0.002  
-        self.kp_linear = 0.005 
+        # Példányosítjuk az Állapotgépet
+        self.state_machine = AIStateMachine()
 
-        # --- 4. HAILO AI CHIP INICIALIZÁLÁSA ---
-        self.get_logger().info("🧠 Hailo-8 AI inicializálása folyamatban...")
+        self.get_logger().info("🧠 Hailo-8 POSE AI indítása...")
         self.stack = ExitStack()
         
         try:
-            # A Docker konténerben a fájl pontos helye:
-            hef_path = "src/ros2-hexa/my_hexapod/yolov8s.hef"
-            self.hef = HEF(hef_path)
+            script_dir = os.path.dirname(os.path.realpath(__file__))
+            hef_path = os.path.join(script_dir, "..", "yolov8s_pose.hef")
             
-            # Csatlakozás a fizikai chiphez
+            if not os.path.exists(hef_path):
+                self.get_logger().error(f"❌ NEM TALÁLOM A POSE HEF FÁJLT: {hef_path}")
+                return
+
+            self.hef = HEF(hef_path)
             self.target = self.stack.enter_context(VDevice())
             
-            # Modell konfigurálása a chipen
             self.configure_params = ConfigureParams.create_from_hef(hef=self.hef, interface=HailoStreamInterface.PCIe)
             self.network_groups = self.target.configure(self.hef, self.configure_params)
             self.network_group = self.network_groups[0]
             self.network_group_params = self.network_group.create_params()
             
-            # Bemeneti és kimeneti adatcsatornák (VStreams) létrehozása
             self.input_vstreams_params = InputVStreamParams.make(self.network_group, format_type=FormatType.UINT8)
             self.output_vstreams_params = OutputVStreamParams.make(self.network_group, format_type=FormatType.FLOAT32)
             
@@ -58,169 +60,144 @@ class AIVisionNode(Node):
             )
             self.stack.enter_context(self.network_group.activate(self.network_group_params))
             
-            # --- JAVÍTÁS: HailoRT v4.23 API változás ---
-            # A neveket most már közvetlenül a HEF modellből olvassuk ki
             self.input_name = self.hef.get_input_vstream_infos()[0].name
-            self.output_name = self.hef.get_output_vstream_infos()[0].name
             
-            self.get_logger().info("✅ Hailo-8 YOLOv8s KÉSZEN ÁLL A VADÁSZATRA!")
+            shape = self.hef.get_input_vstream_infos()[0].shape
+            self.model_h, self.model_w = (shape[1], shape[2]) if len(shape) == 4 else (640, 640)
+                
+            self.get_logger().info(f"✅ LÁTÓIDEG KÉSZEN ÁLL! ({self.model_w}x{self.model_h})")
             
         except Exception as e:
             self.get_logger().error(f"❌ HAILO INICIALIZÁLÁSI HIBA: {e}")
             self.stack.close()
 
+    def mode_callback(self, msg):
+        self.current_ai_mode = msg.data
+        
+        # --- ÚJ: Szelektív amnézia altatáskor ---
+        # Ha a robot megáll (STANDBY), azonnal nullázzuk a State Machine memóriáját is!
+        if self.current_ai_mode == "STANDBY" and hasattr(self, 'state_machine'):
+            self.state_machine.last_mode = "STANDBY"
+            self.state_machine._reset_memory()
+
     def image_callback(self, msg):
-        # Frame eldobása, ha az AI épp dolgozik
-        if getattr(self, 'is_processing', False):
+        # --- POWER GATING: Ha Standby, azonnal eldobja a képet, a chip pihen! ---
+        if self.is_processing or self.current_ai_mode == "STANDBY":
             return
             
         self.is_processing = True
 
         try:
-            # 1. Kép átalakítása (ROS -> OpenCV)
-            frame = self.bridge.imgmsg_to_cv2(msg, "rgb8") # A Hailo RGB-t szeret!
+            frame_original = self.bridge.imgmsg_to_cv2(msg, "rgb8") 
+            orig_h, orig_w = frame_original.shape[:2]
+            input_img = cv2.resize(frame_original, (self.model_w, self.model_h))
             
-            # 2. YOLOv8 méretezés (640x640)
-            orig_h, orig_w = frame.shape[:2]
-            input_img = cv2.resize(frame, (640, 640))
-            
-            # 3. BEKÜLDÉS A HAILO CHIPBE (A Varázslat itt történik!)
-            # Ez a művelet a CPU-t egyáltalán nem terheli, a 26 TOPS-os chip végzi!
+            # Csak aktív AI módban ébresztjük fel a Hailo chipet
             infer_results = self.infer_pipeline.infer({self.input_name: np.expand_dims(input_img, axis=0)})
             
-            # 4. KIMENET FELDOLGOZÁSA
-            detections = infer_results[self.output_name][0] 
-            
-            ai_cmd = Twist()
-            best_person = None
-            max_conf = 0.0
-            
-           # 4. KIMENET FELDOLGOZÁSA
-            ai_cmd = Twist()
-            best_person = None
-            max_conf = 0.0
-            
-            # 1. A kőbe vésett (80, 5, 100) mátrix átvétele a chiptől
-            raw_output = infer_results[self.output_name][0]
-            
-            # 2. Kivesszük a 0. osztályt (Ember). Ez GARANTÁLTAN egy (5, 100)-as fix mátrix.
-            # 0. sor: ymin, 1. sor: xmin, 2. sor: ymax, 3. sor: xmax, 4. sor: confidence
-            person_matrix = raw_output[0]
-            
-            # 3. Végigmegyünk a fix 100 helyen (Nincs dinamikus trükközés, nincs unpacking hiba)
-            for i in range(100):
-                conf = person_matrix[4][i]  # A 4. sor az i-edik oszlopban a magabiztosság
-                
-                # Ha a magabiztosság nagyobb mint 50% (azaz nem egy üres, nullákkal teli hely)
-                if conf > 0.5:
-                    if conf > max_conf:
-                        max_conf = conf
-                        ymin = person_matrix[0][i]
-                        xmin = person_matrix[1][i]
-                        ymax = person_matrix[2][i]
-                        xmax = person_matrix[3][i]
-                        best_person = (ymin, xmin, ymax, xmax, conf)
-            
-            # --- ROBOT MOZGATÁSA ---
-            if best_person is not None:
-                ymin, xmin, ymax, xmax, conf = best_person
-                
-                # YOLOv8 normalizált (0.0 - 1.0) koordináták visszaszorzása
-                box_x = xmin * 640
-                box_y = ymin * 640
-                box_w = (xmax - xmin) * 640
-                
-                box_center_x = box_x + (box_w / 2)
-                
-                # --- PID SZABÁLYOZÁS ---
-                error_yaw = self.center_x - box_center_x 
-                ai_cmd.angular.z = error_yaw * self.kp_yaw
-                
-                error_linear = self.target_width - box_w
-                ai_cmd.linear.x = error_linear * self.kp_linear
-                
-                # Sebességkorlátozás
-                ai_cmd.angular.z = max(min(ai_cmd.angular.z, 0.5), -0.5)
-                ai_cmd.linear.x = max(min(ai_cmd.linear.x, 0.5), -0.5)
+            best_person_keypoints = None
+            global_max_conf = 0.0
 
-                irany = "BALRA ⬅️" if ai_cmd.angular.z > 0 else "JOBBRA ➡️" if ai_cmd.angular.z < 0 else "KÖZÉPEN 🎯"
-                tav = "ELŐRE ⬆️" if ai_cmd.linear.x > 0 else "HÁTRA ⬇️" if ai_cmd.linear.x < 0 else "ÁLL 🛑"
-                
-                self.get_logger().info(
-                    f"🤖 LÁTOK EGY EMBERT! ({conf*100:.0f}%) -> Forgás: {irany}, Séta: {tav}"
-                )
-            else:
-                self.get_logger().info("Nincs ember a láthatáron... 😴")
-
-            # Parancs kiküldése az Agynak
-            self.cmd_pub.publish(ai_cmd)
+            vstream_infos = self.hef.get_output_vstream_infos()
+            grids = {}
             
-            ai_cmd = Twist()
-            best_person = None
-            max_conf = 0.0
-            
-            # Végigmegyünk a talált dobozokon
-            for det in detections:
-                ymin, xmin, ymax, xmax, conf, class_id = det
+            for v_info in vstream_infos:
+                grid = infer_results[v_info.name][0]
+                if len(grid.shape) != 3: continue
+                h, w, c = grid.shape
                 
-                # Ha a találat biztosabb mint 50%, ÉS a Class ID 0 (Ember)
-                if conf > 0.5 and int(class_id) == 0:
-                    if conf > max_conf:
-                        max_conf = conf
-                        best_person = det
-            
-            if best_person is not None:
-                ymin, xmin, ymax, xmax, conf, class_id = best_person
-                
-                # A YOLOv8 normalizált (0.0 - 1.0) koordinátákat ad vissza, 
-                # ezt visszaszorozzuk a 640-es méretre
-                box_x = xmin * 640
-                box_y = ymin * 640
-                box_w = (xmax - xmin) * 640
-                
-                box_center_x = box_x + (box_w / 2)
-                
-                # --- PID SZABÁLYOZÁS A MOZGÁSHOZ ---
-                error_yaw = self.center_x - box_center_x 
-                ai_cmd.angular.z = error_yaw * self.kp_yaw
-                
-                error_linear = self.target_width - box_w
-                ai_cmd.linear.x = error_linear * self.kp_linear
-                
-                ai_cmd.angular.z = max(min(ai_cmd.angular.z, 0.5), -0.5)
-                ai_cmd.linear.x = max(min(ai_cmd.linear.x, 0.5), -0.5)
+                if (h, w) not in grids: grids[(h, w)] = {'cls': None, 'kpts': None, 'unknown_64': []}
+                    
+                if c <= 8: grids[(h, w)]['cls'] = grid
+                elif c == 51 or c == 56: grids[(h, w)]['kpts'] = grid
+                elif c == 64: grids[(h, w)]['unknown_64'].append(grid)
+                else: grids[(h, w)]['kpts'] = grid
+                    
+            for (h, w), branches in grids.items():
+                if branches['kpts'] is None and len(branches['unknown_64']) >= 2:
+                    t1, t2 = branches['unknown_64'][0], branches['unknown_64'][1]
+                    branches['kpts'] = t1 if np.max(np.abs(t1[:, :, 51:])) < 1e-5 else t2
 
-                irany = "BALRA ⬅️" if ai_cmd.angular.z > 0 else "JOBBRA ➡️" if ai_cmd.angular.z < 0 else "KÖZÉPEN 🎯"
-                tav = "ELŐRE ⬆️" if ai_cmd.linear.x > 0 else "HÁTRA ⬇️" if ai_cmd.linear.x < 0 else "ÁLL 🛑"
+            for (h, w), branches in grids.items():
+                if branches['cls'] is None or branches['kpts'] is None: continue
                 
-                self.get_logger().info(
-                    f"🤖 CÉLPONT BEMÉRVE! (Ember: {conf*100:.0f}%) -> "
-                    f"Forgás: {irany}, Séta: {tav}"
-                )
-            else:
-                self.get_logger().info("Nincs ember a láthatáron... 😴")
+                cls_grid = branches['cls']
+                kpts_grid = branches['kpts']
+                scores = cls_grid[:, :, 0] 
+                
+                cy, cx = np.unravel_index(np.argmax(scores), (h, w))
+                local_max_conf = scores[cy, cx]
+                
+                if local_max_conf > 0.6 and local_max_conf > global_max_conf:
+                    global_max_conf = local_max_conf
+                    kp_raw = kpts_grid[cy, cx, :51]
+                    parsed_keypoints = {}
+                    
+                    stride = self.model_w / w 
+                    scale_x = orig_w / self.model_w
+                    scale_y = orig_h / self.model_h
+                    
+                    for i in range(17):
+                        idx = i * 3
+                        kx, ky, kconf = kp_raw[idx], kp_raw[idx+1], kp_raw[idx+2]
+                        
+                        px = kx if abs(kx) > self.model_w else (kx * 2.0 + cx) * stride
+                        py = ky if abs(kx) > self.model_w else (ky * 2.0 + cy) * stride
+                            
+                        parsed_keypoints[i] = {'x': int(px * scale_x), 'y': int(py * scale_y), 'conf': float(kconf)}
+                        
+                    best_person_keypoints = parsed_keypoints
 
-            # Parancs kiküldése az Agynak
-            self.cmd_pub.publish(ai_cmd)
+            # --- ÁTADJUK AZ IRÁNYÍTÁST AZ ÁLLAPOTGÉPNEK ---
+            cmd_vel, anim_cmd = self.state_machine.process(self.current_ai_mode, best_person_keypoints)
+
+            # --- VIZUALIZÁCIÓ ---
+            do_visualize = self.image_pub.get_subscription_count() > 0
+            
+            if do_visualize:
+                overlay_frame = cv2.cvtColor(frame_original, cv2.COLOR_RGB2BGR)
+                cv2.putText(overlay_frame, f"MODE: {self.current_ai_mode} | CONF: {global_max_conf*100:.0f}%", 
+                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+
+                if best_person_keypoints is not None:
+                    for i, kp in best_person_keypoints.items():
+                        if kp['conf'] > 0.4: cv2.circle(overlay_frame, (kp['x'], kp['y']), 5, (0, 0, 255), -1)
+                    
+                    l_hip, r_hip = best_person_keypoints.get(11), best_person_keypoints.get(12)
+                    if l_hip and r_hip and l_hip['conf'] > 0.4 and r_hip['conf'] > 0.4:
+                        cv2.line(overlay_frame, (l_hip['x'], l_hip['y']), (r_hip['x'], r_hip['y']), (0, 255, 0), 3)
+                        
+                success, encoded_image = cv2.imencode('.jpg', overlay_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+                if success:
+                    compressed_msg = CompressedImage()
+                    compressed_msg.header = msg.header
+                    compressed_msg.format = "jpeg"
+                    compressed_msg.data = encoded_image.tobytes()
+                    self.image_pub.publish(compressed_msg)
+
+            # --- PARANCSOK KIKÜLDÉSE ---
+            self.cmd_pub.publish(cmd_vel)
+            if anim_cmd != "NONE":
+                msg_str = String()
+                # ÚJ: "STOP" helyett "CLEAR_ANIM"-ot küldünk az Agynak!
+                msg_str.data = "CLEAR_ANIM" if anim_cmd == "STOP" else f"ANIM_{anim_cmd}"
+                self.cmd_str_pub.publish(msg_str)
 
         except Exception as e:
-            self.get_logger().error(f"Hiba a képfeldolgozás során: {e}")
+            self.get_logger().error(f"Hiba a callback-ben: {e}")
             
         finally:
             self.is_processing = False
 
     def destroy_node(self):
-        # Szabályos leállításkor elengedjük a PCIe eszközt!
         self.stack.close()
         super().destroy_node()
 
 def main(args=None):
     rclpy.init(args=args)
     node = AIVisionNode()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+    try: rclpy.spin(node)
+    except KeyboardInterrupt: pass
     finally:
         node.destroy_node()
         rclpy.shutdown()

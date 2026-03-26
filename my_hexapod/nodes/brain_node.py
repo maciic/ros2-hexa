@@ -2,78 +2,108 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
-import time
 
 class HexapodBrainNode(Node):
     def __init__(self):
         super().__init__('hexapod_brain')
         
-        # --- 1. AZ ÁLLAPOTGÉP VÁLTOZÓI (STATE MACHINE) ---
-        self.control_mode = "MANUAL"      # Ki vezet? MANUAL vagy AI
-        self.current_state = "IDLE"       # Fő állapot: IDLE, WALK, ANIMATION
-        self.active_gait = "TRIPOD"       # Al-állapot sétához: TRIPOD, RIPPLE
-        self.active_animation = "NONE"    # Al-állapot animációhoz: ATTACK, WAVE, NONE
+        # --- 1. ÁLLAPOTVÁLTOZÓK ---
+        self.control_mode = "MANUAL"      
+        self.current_state = "IDLE"       
+        self.active_gait = "TRIPOD"       
+        self.active_animation = "NONE"    
         
-        # Bemeneti sebességek tárolása
+        # ÚJ: Belső állapot az AI viselkedéshez
+        self.active_ai_mode = "STANDBY"
+        
         self.joy_vel = Twist()
         self.ai_vel = Twist()
         
-        # --- 2. FELIRATKOZÁSOK (Bemenetek) ---
+        # --- 2. FELIRATKOZÁSOK ---
         self.create_subscription(Twist, 'cmd_vel_joy', self.joy_vel_callback, 10)
         self.create_subscription(Twist, 'cmd_vel_ai', self.ai_vel_callback, 10)
         self.create_subscription(String, 'robot_command', self.command_callback, 10)
         
-        # --- 3. PUBLISHEREK (Kimenetek az Izomzat felé) ---
+        # --- 3. PUBLISHEREK ---
         self.vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
-        self.state_pub = self.create_publisher(String, 'robot_state', 10) # <--- ÚJ: A hivatalos állapot
+        self.state_pub = self.create_publisher(String, 'robot_state', 10)
         
-        # 50 Hz-es időzítő a logikához
+        # ÚJ: Ezen a csatornán mondjuk meg az AI Node-nak, hogy mit csináljon a képpel!
+        self.ai_mode_pub = self.create_publisher(String, 'ai_current_mode', 10) 
+        
         self.timer = self.create_timer(1.0 / 50.0, self.timer_callback)
-        
-        self.get_logger().info("Agy 2.0 (Állapotgép) online! 🧠")
+        self.get_logger().info("Agy 3.0 (AI Menürendszerrel) online! 🧠")
 
-    def joy_vel_callback(self, msg):
-        self.joy_vel = msg
-
-    def ai_vel_callback(self, msg):
-        self.ai_vel = msg
+    def joy_vel_callback(self, msg): self.joy_vel = msg
+    def ai_vel_callback(self, msg): self.ai_vel = msg
 
     def command_callback(self, msg):
-        """ Itt dolgozzuk fel a Mapperből jövő gombnyomásokat """
         cmd = msg.data
         
-        # 1. Vezérlési mód váltása
-        if cmd == "TOGGLE_AI":
-            self.control_mode = "AI" if self.control_mode == "MANUAL" else "MANUAL"
-            self.get_logger().info(f"Vezérlés átadva: {self.control_mode}")
+        # 1. Rendszerszintű módváltás (Manual <-> AI)
+        if cmd.startswith("SYS_MODE_"):
+            self.control_mode = cmd.replace("SYS_MODE_", "")
+            self.get_logger().info(f"⚙️ Rendszer átállítva: {self.control_mode} vezérlésre")
             
-        # 2. Vészmegállás / Reset
+            # --- ÚJ: Fantom sebességek törlése módváltáskor! ---
+            self.joy_vel = Twist()
+            self.ai_vel = Twist()
+            
+            if self.control_mode == "AI":
+                self.active_ai_mode = "STANDBY"
+                self.ai_mode_pub.publish(String(data=self.active_ai_mode))
+                self.current_state = "IDLE"
+            
+            elif self.control_mode == "MANUAL":
+                self.active_ai_mode = "STANDBY"
+                self.ai_mode_pub.publish(String(data=self.active_ai_mode)) 
+                self.current_state = "IDLE"
+                self.active_animation = "NONE" 
+            
+        # 2. Vészmegállás (Kizárólag a PS5 "X" gombja küldi)
         elif cmd == "STOP":
             self.current_state = "IDLE"
             self.active_animation = "NONE"
-            self.get_logger().warn("STOP! Visszatérés IDLE módba.")
             
-        # 3. Járásmód (Gait) beállítása (Pl. GAIT_RIPPLE)
-        elif cmd.startswith("GAIT_"):
+            # --- ÚJ: Fantom sebességek törlése megálláskor! ---
+            self.joy_vel = Twist()
+            self.ai_vel = Twist()
+            
+            if self.control_mode == "AI":
+                self.active_ai_mode = "STANDBY"
+                self.ai_mode_pub.publish(String(data=self.active_ai_mode))
+            self.get_logger().warn("🛑 VÉSZMEGÁLLÁS! Visszatérés IDLE/STANDBY módba.")
+
+        # 3. ÚJ: Animáció leállítása (Az AI küldi, ha kimegy az ember a képből)
+        elif cmd == "CLEAR_ANIM":
+            self.current_state = "IDLE"
+            self.active_animation = "NONE"
+            # FIGYELEM: Itt NEM nyúlunk a self.active_ai_mode-hoz!
+            # Így a kamera tovább figyel, és nem alszik el a chip!
+            self.get_logger().info("⏸️ Animáció leállítva, várakozás a célpontra...")
+            
+        # 4. AI Viselkedések kiválasztása (Csak ha az AI vezet)
+        elif cmd.startswith("AI_") and self.control_mode == "AI":
+            self.active_ai_mode = cmd.replace("AI_", "") 
+            self.ai_mode_pub.publish(String(data=self.active_ai_mode))
+            self.get_logger().info(f"🧠 AI Mód aktiválva: {self.active_ai_mode}")
+            
+        # 5. Kézi Járásmódok (Csak ha MANUAL)
+        elif cmd.startswith("GAIT_") and self.control_mode == "MANUAL":
             self.active_gait = cmd.replace("GAIT_", "")
-            self.get_logger().info(f"Kiválasztott járásmód: {self.active_gait}")
+            self.get_logger().info(f"🐾 Járásmód: {self.active_gait}")
             
-        # 4. Animációk indítása (Pl. ANIM_ATTACK)
+        # 6. Animációk indítása
         elif cmd.startswith("ANIM_"):
             self.active_animation = cmd.replace("ANIM_", "")
-            self.current_state = "ANIMATION" # Azonnal felülírjuk az állapotot!
-            self.get_logger().info(f"Animáció indítása: {self.active_animation}")
+            self.current_state = "ANIMATION" 
+            self.get_logger().info(f"🎬 Animáció indítása: {self.active_animation}")
 
     def timer_callback(self):
-        """ Ez fut le másodpercenként 50-szer. Itt dől el a végső állapot! """
-        
-        # 1. Melyik sebességet figyeljük?
         current_input_vel = self.joy_vel if self.control_mode == "MANUAL" else self.ai_vel
         
-        # 2. ÁLLAPOT DÖNTÉS
-        # Ha épp animációt játszunk, nem engedjük a sétát. Csak a STOP gomb szakíthatja meg.
         if self.current_state != "ANIMATION":
-            # Van mozgás parancs a karokon? (Deadzone ellenőrzés)
+            # Mozgás érzékelése
             if abs(current_input_vel.linear.x) > 0.1 or \
                abs(current_input_vel.linear.y) > 0.1 or \
                abs(current_input_vel.angular.z) > 0.1:
@@ -81,21 +111,17 @@ class HexapodBrainNode(Node):
             else:
                 self.current_state = "IDLE"
 
-        # 3. HIVATALOS ÁLLAPOT ÖSSZEÁLLÍTÁSA ÉS KIKÜLDÉSE
         state_msg = String()
-        
         if self.current_state == "IDLE":
             state_msg.data = "IDLE"
         elif self.current_state == "WALK":
-            state_msg.data = f"WALK_{self.active_gait}" # pl: "WALK_TRIPOD" vagy "WALK_RIPPLE"
+            state_msg.data = f"WALK_{self.active_gait}"
         elif self.current_state == "ANIMATION":
-            state_msg.data = f"ANIM_{self.active_animation}" # pl: "ANIM_ATTACK"
+            state_msg.data = f"ANIM_{self.active_animation}"
             
-        # 4. ÜZENETEK KÜLDÉSE AZ IZOMZATNAK
         self.state_pub.publish(state_msg)
         
-        # Ha animáció fut, lenullázzuk a sebességet, hogy a lábak ne próbáljanak sétálni közben
-        if self.current_state == "ANIMATION":
+        if self.current_state == "ANIMATION" or (self.control_mode == "AI" and self.active_ai_mode == "STANDBY"):
             self.vel_pub.publish(Twist()) 
         else:
             self.vel_pub.publish(current_input_vel)
