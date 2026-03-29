@@ -19,6 +19,7 @@ class PS5MapperNode(Node):
             2: "SQUARE",    # ANIM_ATTACK / AI_FOLLOW
             3: "TRIANGLE",  # AI_SENTRY
             6: "OPTIONS",   # Módváltó gomb!
+            10: "R1",       # SIT
             11: "DPAD_UP",  # Tripod
             12: "DPAD_DOWN",# Ripple
             13: "DPAD_LEFT",# Bi-Gait
@@ -71,6 +72,7 @@ class PS5MapperNode(Node):
             # Animációk
             if btn_name == "SQUARE": cmd_msg.data = "ANIM_ATTACK"
             elif btn_name == "CIRCLE": cmd_msg.data = "ANIM_WAVE" 
+            elif btn_name == "TRIANGLE": cmd_msg.data = "ANIM_SIT"
             # ÚJ: Járásmódok a D-PAD-en
             elif btn_name == "DPAD_UP": cmd_msg.data = "GAIT_TRIPOD"
             elif btn_name == "DPAD_DOWN": cmd_msg.data = "GAIT_RIPPLE"

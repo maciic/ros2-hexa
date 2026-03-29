@@ -4,11 +4,11 @@ from .robot_animations import HexapodAnimations
 class HexapodGait:
     def __init__(self):
         self.params = {
-            'freq': 0.7,           
+            'freq': 1.6,           
             'step_len': 120.0,     
-            'step_height': 60.0,   
-            'base_dist': 300.0,    
-            'base_height': -80.0  
+            'step_height': 80.0,   
+            'base_dist': 280.0,    
+            'base_height': -100.0  
         }
         
         self.animations = HexapodAnimations()
@@ -65,10 +65,12 @@ class HexapodGait:
         if self.current_state == "IDLE":
             return self.animations.get_idle_breathing(t)
         elif self.current_state == "WALK":
+            self.animations.sit_blend = 0.0
             return {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}, 0.0, {}
         elif self.current_state == "ANIMATION":
             if self.active_animation == "ATTACK": return self.animations.get_attack_pose(t)
             elif self.active_animation == "WAVE": return self.animations.get_wave_pose(t)
+            elif self.active_animation == "SIT": return self.animations.get_sit_pose(t) # <--- ÚJ
             return {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}, 0.0, {}
 
     def get_leg_phase(self, leg_key, t):
@@ -85,12 +87,26 @@ class HexapodGait:
             return 0.0, 0.0, 0.0, 0.0
 
         magnitude = math.sqrt(vel_x**2 + vel_y**2 + vel_yaw**2)
-        if magnitude > 1.0:
-            vel_x, vel_y, vel_yaw = vel_x / magnitude, vel_y / magnitude, vel_yaw / magnitude
-
-        walk_amp = (self.params['step_len'] / 2.0) * vel_x
-        strafe_amp = (self.params['step_len'] / 2.0) * vel_y
-        turn_amp = (self.params['step_len'] / 2.0) * vel_yaw
+        
+        if magnitude > 0.01:
+            dir_x = vel_x / magnitude
+            dir_y = vel_y / magnitude
+            dir_yaw = vel_yaw / magnitude
+            
+            # Alap lopakodó hossz (70% - 100%)
+            length_factor = 0.7 + (0.3 * magnitude)
+            
+            # --- ÚJ: LÁGY INDÍTÁS (STARTUP FADE) ---
+            # Ez megakadályozza a hirtelen ugrást! Kb. 6-8 képkocka alatt 
+            # (0.15 mp) úsztatja be a lépés hosszát 0-ról a lopakodó szintre.
+            startup_fade = min(1.0, magnitude * 3.0)
+            
+            # Rászorozzuk a fade-et a végső amplitúdóra
+            walk_amp = (self.params['step_len'] / 2.0) * dir_x * length_factor * startup_fade
+            strafe_amp = (self.params['step_len'] / 2.0) * dir_y * length_factor * startup_fade
+            turn_amp = (self.params['step_len'] / 2.0) * dir_yaw * length_factor * startup_fade
+        else:
+            walk_amp, strafe_amp, turn_amp = 0.0, 0.0, 0.0
 
         # --- ÚJ: Itt is a beépített profilból kérjük le a push_fraction-t! ---
         push_fraction, _ = self._get_gait_profile()

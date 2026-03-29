@@ -40,6 +40,20 @@ class HexapodBrainNode(Node):
     def command_callback(self, msg):
         cmd = msg.data
         
+        # --- 0. HALÁL / KÓMA MÓD ---
+        if cmd == "SYS_DEAD":
+            self.control_mode = "DEAD"
+            self.current_state = "ANIMATION"
+            self.active_animation = "SIT"
+            self.joy_vel = Twist()
+            self.ai_vel = Twist()
+            self.get_logger().error("☠️ RENDSZER LEZÁRVA! (Akku kritikus, robot leültetve)")
+            return
+
+        # Ha a robot "halott", semmilyen további parancsot nem engedünk át!
+        if self.control_mode == "DEAD":
+            return
+        
         # 1. Rendszerszintű módváltás (Manual <-> AI)
         if cmd.startswith("SYS_MODE_"):
             self.control_mode = cmd.replace("SYS_MODE_", "")
@@ -72,7 +86,7 @@ class HexapodBrainNode(Node):
             if self.control_mode == "AI":
                 self.active_ai_mode = "STANDBY"
                 self.ai_mode_pub.publish(String(data=self.active_ai_mode))
-            self.get_logger().warn("🛑 VÉSZMEGÁLLÁS! Visszatérés IDLE/STANDBY módba.")
+            self.get_logger().warn("🛑 STOP! Visszatérés IDLE/STANDBY módba.")
 
         # 3. ÚJ: Animáció leállítása (Az AI küldi, ha kimegy az ember a képből)
         elif cmd == "CLEAR_ANIM":
