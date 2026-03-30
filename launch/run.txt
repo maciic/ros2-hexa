@@ -48,6 +48,14 @@ nohup rpicam-vid -t 0 --width 640 --height 480 --framerate 30 --codec mjpeg -o -
 -----------------------------------
 ros2 run v4l2_camera v4l2_camera_node --ros-args -p video_device:="/dev/video50"
 
+# Kamera topic a saját config fájlal
+-----------------------------------
+ros2 run v4l2_camera v4l2_camera_node --ros-args -p video_device:="/dev/video50" -p camera_info_url:="file:///ros_ws/src/ros2-hexa/my_hexapod/config/camera_info.yaml"
+
+# valami sárga vonal
+-----------------------------------
+ros2 run tf2_ros static_transform_publisher 0.074 0.0 0.081 0.0 -0.245 0.0 base_link camera_link
+
 # Kamera tesztelése hogy fut-el:
 -----------------------------------
 ps aux | grep rpicam-vid

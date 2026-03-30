@@ -39,6 +39,7 @@ setup(
             'brain_node = my_hexapod.nodes.brain_node:main', # Az agy, ami a vezérlő
             'ai_vision_node = my_hexapod.nodes.ai_vision_node:main', # A szem, ami látja a világot
             'calibration_node = my_hexapod.nodes.calibration_node:main', # A kalibráló, ami segít beállítani a szervókat
+            'imu_node = my_hexapod.nodes.imu_node:main', # Az IMU szenzor node-ja
         ],
     },
 )

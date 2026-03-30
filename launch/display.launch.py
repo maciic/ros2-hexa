@@ -49,7 +49,7 @@ def generate_launch_description():
             output='screen'
         ),
 
-        # 5. Contact / Szenzor node
+        # 5. AI Vision Node a kamerakép feldolgozásához
         Node(
             package='my_hexapod',
             executable='ai_vision_node',
@@ -70,7 +70,7 @@ def generate_launch_description():
 
         # --- ÚJ NODE-OK A SKYNET RENDSZERHEZ ---
 
-        # 7. A Fordító (A régi teleop_node helyett. Gombok és karok feldolgozása)
+        # 7. PS5 kontroller mapper
         Node(
             package='my_hexapod',
             executable='ps5_mapper',
@@ -94,5 +94,82 @@ def generate_launch_description():
             executable='foxglove_bridge',
             name='foxglove_bridge',
             output='screen'
-        )
+        ),
+        
+        # 10. IMU Node (Inertial Measurement Unit - Gyorsulásmérő és Giroszkóp)
+        Node(
+            package='my_hexapod',
+            executable='imu_node',
+            name='imu_node',
+            output='screen'
+        ),
+        
+        # ---------------------------------------
+        # --- ÚJ NODE-OK A VIO/SLAM RENDSZERHEZ ---
+        # ---------------------------------------
+
+        # 11. IMU Szűrő (Madgwick) - Ezt eddig külön indítottad, most automatizáljuk!
+        Node(
+            package='imu_filter_madgwick',
+            executable='imu_filter_madgwick_node',
+            name='imu_filter',
+            parameters=[
+                {'use_mag': False},
+                {'publish_tf': False}
+            ]
+        ),
+
+        # 12. Kamera node (A virtuális eszközzel és a kiszámolt Szemüveggel)
+        Node(
+            package='v4l2_camera',
+            executable='v4l2_camera_node',
+            name='v4l2_camera',
+            parameters=[
+                {'video_device': '/dev/video50'},
+                # Hagyd meg a saját, jó útvonaladat a YAML-hoz!
+                {'camera_info_url': 'file:///hexapod_workspace/src/ros2-hexa/my_hexapod/config/camera_info.yaml'},
+                
+                # --- ÚJ: FORMATÁLÁS AZ AI SZÁMÁRA ---
+                {'output_encoding': 'rgb8'},   # Kijavítja a "Could not convert" errort!
+                {'image_size': [640, 480]}     # Megvédi a Pi-t a túlterheléstől
+            ]
+        ),
+
+        # 13. A "Nyakcsigolya"
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='camera_static_tf',
+            # A 'camera_link' helyett most már csak 'camera' legyen a vége!
+            arguments=['0.074', '0.0', '0.081', '0.0', '-0.245', '0.0', 'base_link', 'camera'] 
+        ),
+
+        # 14. RTAB-Map (A Vizuális Térképező és Odometria korrigáló AI)
+        Node(
+            package='rtabmap_slam', 
+            executable='rtabmap',
+            name='rtabmap',
+            parameters=[
+                {'subscribe_depth': False},
+                {'subscribe_rgb': True},
+                {'subscribe_odom': True},
+                {'frame_id': 'base_link'},
+                {'odom_frame_id': 'odom'},
+                
+                # --- A MEGOLDÁS A 25 vs 30 Hz HIBÁRA ---
+                {'approx_sync': True},         # Megengedi az időcsúszást a kép és az infó között!
+                {'queue_size': 20},            # Kicsit nagyobb puffer a csúszó adatoknak
+                
+                # Vizuális beállítások
+                {'RGBD/AngularUpdate': '0.01'},
+                {'RGBD/LinearUpdate': '0.01'},
+                {'Rtabmap/DetectionRate': '2'}
+            ],
+            remappings=[
+                ('rgb/image', '/image_raw'),
+                ('rgb/camera_info', '/camera_info'),
+                ('odom', '/odom/kinematic')
+            ],
+            arguments=['-d'] 
+        ),
     ])
