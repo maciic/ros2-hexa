@@ -17,12 +17,12 @@
         "tibia": 3.14
     },
     "legs": {
-        "leg_1": { "id": 1, "side": "right", "mount_x": 83.5, "mount_y": 66.5, "mount_angle_rad": 0.668 },
-        "leg_2": { "id": 2, "side": "right", "mount_x": 0.0,  "mount_y": 91.6, "mount_angle_rad": 1.5708 },
-        "leg_3": { "id": 3, "side": "right", "mount_x": -83.5,"mount_y": 66.5, "mount_angle_rad": 2.4735 },
-        "leg_4": { "id": 4, "side": "left",  "mount_x": 83.5,"mount_y": -66.5,  "mount_angle_rad": -0.668 },
-        "leg_5": { "id": 5, "side": "left",  "mount_x": 0.0,  "mount_y": -91.6,  "mount_angle_rad": -1.5708 },
-        "leg_6": { "id": 6, "side": "left",  "mount_x": -83.5, "mount_y": -66.5,  "mount_angle_rad": -2.4735 }
+        "leg_1": { "id": 1, "side": "right", "mount_x": 83.5, "mount_y": -66.5, "mount_angle_rad": -0.668 },
+        "leg_2": { "id": 2, "side": "right", "mount_x": 0.0,  "mount_y": -91.6, "mount_angle_rad": -1.5708 },
+        "leg_3": { "id": 3, "side": "right", "mount_x": -83.5,"mount_y": -66.5, "mount_angle_rad": -2.4735 },
+        "leg_4": { "id": 4, "side": "left",  "mount_x": 83.5,"mount_y": 66.5,  "mount_angle_rad": 0.668 },
+        "leg_5": { "id": 5, "side": "left",  "mount_x": 0.0,  "mount_y": 91.6,  "mount_angle_rad": 1.5708 },
+        "leg_6": { "id": 6, "side": "left",  "mount_x": -83.5, "mount_y": 66.5,  "mount_angle_rad": 2.4735 }
     },
     "camera": {
         "position": { "x": 0.074, "y": 0.0, "z": 0.081 },

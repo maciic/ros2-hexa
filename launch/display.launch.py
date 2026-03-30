@@ -135,13 +135,21 @@ def generate_launch_description():
             ]
         ),
 
-        # 13. A "Nyakcsigolya"
+        # 13. A Kamera "Nyakcsigolya"
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
             name='camera_static_tf',
             # A 'camera_link' helyett most már csak 'camera' legyen a vége!
-            arguments=['0.074', '0.0', '0.081', '0.0', '-0.245', '0.0', 'base_link', 'camera'] 
+            arguments=['0.074', '0.0', '0.081', '-1.5708', '0.0', '-1.3102', 'base_link', 'camera'] 
+        ),
+        
+        # 13.5 Az IMU "Nyakcsigolyája" (Összeköti a testet az IMU-val a térben)
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='imu_static_tf',
+            arguments=['0.0', '0.0', '0.048', '0.0', '0.0', '0.0', 'base_link', 'imu_link'] 
         ),
 
         # 14. RTAB-Map (A Vizuális Térképező és Odometria korrigáló AI)
@@ -153,22 +161,27 @@ def generate_launch_description():
                 {'subscribe_depth': False},
                 {'subscribe_rgb': True},
                 {'subscribe_odom': True},
+                
+                # --- AZ IMU INTEGRÁCIÓ PARAMÉTEREI ---
+                {'subscribe_imu': True},       # BEKAPCSOLÓ GOMB: Figyeljen a belső fülre!
+                {'wait_imu_to_init': True},    # Induláskor várja meg az első IMU adatot, ne induljon vakon.
+                
+                
                 {'frame_id': 'base_link'},
                 {'odom_frame_id': 'odom'},
-                
-                # --- A MEGOLDÁS A 25 vs 30 Hz HIBÁRA ---
-                {'approx_sync': True},         # Megengedi az időcsúszást a kép és az infó között!
-                {'queue_size': 20},            # Kicsit nagyobb puffer a csúszó adatoknak
-                
-                # Vizuális beállítások
+                {'approx_sync': True},         
+                {'queue_size': 20},            
                 {'RGBD/AngularUpdate': '0.01'},
                 {'RGBD/LinearUpdate': '0.01'},
-                {'Rtabmap/DetectionRate': '2'}
+                
+                # --- TELJESÍTMÉNY MÓD ---
+                {'Rtabmap/DetectionRate': '10'} # 2 Hz helyett 10 Hz: Folyamatos, sima kék vonal!
             ],
             remappings=[
                 ('rgb/image', '/image_raw'),
                 ('rgb/camera_info', '/camera_info'),
-                ('odom', '/odom/kinematic')
+                ('odom', '/odom/kinematic'),
+                ('imu', '/imu/data')           # Itt kapja meg a fizikai adatot
             ],
             arguments=['-d'] 
         ),

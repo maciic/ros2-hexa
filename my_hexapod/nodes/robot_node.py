@@ -117,7 +117,7 @@ class HexapodController(Node):
         
         # 2. SZENZOR OFFSZET: Ha egyenes asztalon is elcsavarja magát, 
         # itt megadhatod a szenzor alap fizikai tévedését radiánban.
-        self.imu_roll_offset = 0.0  
+        self.imu_roll_offset = -0.0349
         self.imu_pitch_offset = 0.0
         
         # Lábvégek (mancsok) publikálása a Foxglove 3D-hez
