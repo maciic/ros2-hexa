@@ -42,7 +42,7 @@ hostname -i
 # Kamera indítása (simán a pi-on):
 -----------------------------------
 sudo modprobe v4l2loopback video_nr=50 exclusive_caps=1 card_label="HexaCam"
-nohup rpicam-vid -t 0 --width 640 --height 480 --framerate 30 --codec mjpeg -o - | ffmpeg -f mjpeg -i - -pix_fmt yuyv422 -f v4l2 /dev/video50 > /dev/null 2>&1 &
+nohup rpicam-vid -t 0 --width 320 --height 240 --framerate 30 --roi 0.25,0.0,0.5,1.0 --codec mjpeg -o - | ffmpeg -f mjpeg -i - -pix_fmt yuyv422 -f v4l2 /dev/video50 > /dev/null 2>&1 &
 
 # Kamera indítása dockerben:
 -----------------------------------
@@ -89,6 +89,9 @@ docker run -it --rm \
 docker exec -it hexapod_brain bash
 
 
+
+flow test: ros2 topic echo /odom/visual --field twist.twist.linear.x
+hz teszt: ros2 topic hz /odom/visual
 
 REMEMBER.
 A servok telepítéséhez valami trükk kell

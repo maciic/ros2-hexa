@@ -133,7 +133,7 @@ def generate_launch_description():
                 
                 # --- ÚJ: FORMATÁLÁS AZ AI SZÁMÁRA ---
                 {'output_encoding': 'rgb8'},   # Kijavítja a "Could not convert" errort!
-                {'image_size': [640, 480]}     # Megvédi a Pi-t a túlterheléstől
+                {'image_size': [320, 240]}     # Megvédi a Pi-t a túlterheléstől
             ]
         ),
 
@@ -176,25 +176,26 @@ def generate_launch_description():
             output='screen'
         ),
 
-        # 15. RGB-D Szinkronizátor (Összepárosítja a színes képet és a mélységet)
+        # 15. RGB-D Szinkronizátor - TÖKÉLETES SZINKRON
         Node(
             package='rtabmap_sync',
             executable='rgbd_sync',
             name='rgbd_sync',
             parameters=[
-                {'approx_sync': True},
-                {'approx_sync_max_interval': 0.05},
-                {'queue_size': 20}
+                # Mivel a Python kódod lemásolja a headert, az időbélyegek hajszálpontosan egyeznek!
+                # Ez a beállítás (approx_sync: False) 0-ra csökkenti a szinkronizátor CPU terhelését!
+                {'approx_sync': False}, 
+                {'queue_size': 30}      # Hatalmas váróterem, hogy egyetlen AI kép se vesszen el!
             ],
             remappings=[
                 ('rgb/image', '/image_raw'),
                 ('depth/image', '/depth/image_raw'),
                 ('rgb/camera_info', '/camera_info'),
-                ('rgbd_image', '/rgbd_image') # Ezt a kombinált csomagot küldi tovább
+                ('rgbd_image', '/rgbd_image') 
             ]
         ),
         
-        # 15.5 AZ ÚJ LÁTÓIDEG: Vizuális Odometria (VIO)
+        # 15.5 A LÁTÓIDEG: Vizuális Odometria (VIO) - VAJSIMA MOZGÁS
         Node(
             package='rtabmap_odom',
             executable='rgbd_odometry',
@@ -202,15 +203,18 @@ def generate_launch_description():
             parameters=[
                 {'frame_id': 'base_link'},
                 {'publish_tf': False},
-                {'subscribe_rgbd': True},     
+                {'subscribe_rgbd': True},
                 
-                # --- VÁLTOZTATÁSOK A SZIKLASZILÁRD FÉKHEZ ---
                 {'guess_frame_id': 'odom'},   
-                {'Odom/GuessMotion': 'false'},    # <--- ÚJ: NE puskázzon a lábakról! Ha áll a kép, mondja azt, hogy állunk.
+                {'Odom/GuessMotion': 'true'}, 
+                {'Reg/Force3DoF': 'true'},     
                 
-                {'Vis/MaxFeatures': '600'},       # <--- ÚJ: 400 kevés volt, 1000 sok. A 600 az arany középút.
-                {'Vis/EstimationType': '0'},      # <--- ÚJ: Vissza 3D->3D módba! Ez sokkal jobban bírja az AI "lélegző" mélységképét.
-                {'Odom/UpdateTargetLinear': '0.01'} 
+                {'Vis/CorType': '1'},         
+                {'Vis/MaxFeatures': '200'},   
+                {'Vis/CorGuessWinSize': '40'}, 
+                
+                # <--- A MOZGÁS KISIMÍTÁSA ---
+                {'Odom/Strategy': '1'}  # CSERE 0-ról 1-re: Frame-to-Frame mód! Nem a térképhez, csak az előző képkockához méri magát. Nagyon gyors, nem szaggat!
             ],
             remappings=[
                 ('rgbd_image', '/rgbd_image'),
@@ -219,16 +223,15 @@ def generate_launch_description():
             ]
         ),
 
-        # 16. RTAB-Map (Immár igazi 3D VIO / RGB-D MÓDBAN!)
+        # 16. RTAB-Map (A "Nagyagy" - Térképező)
         Node(
             package='rtabmap_slam', 
             executable='rtabmap',
             name='rtabmap',
             parameters=[
-                # Kikapcsoljuk a külön csatornákat, mert most már az "egybecsomagolt" rgbd_image-t használjuk
                 {'subscribe_depth': False}, 
                 {'subscribe_rgb': False},   
-                {'subscribe_rgbd': True},   # <--- EZ KAPCSOLJA BE A 3D MÓDOT
+                {'subscribe_rgbd': True},   
                 
                 {'subscribe_odom': True},
                 {'subscribe_imu': True},
@@ -237,31 +240,27 @@ def generate_launch_description():
                 {'frame_id': 'base_link'},
                 {'odom_frame_id': 'odom'},
                 {'approx_sync': True},         
-                {'queue_size': 20},    
+                {'queue_size': 2},  
                 
-                {'Grid/RangeMax': '4.0'},            # Ne rajzoljon le semmit, ami 5 méternél messzebb van (ott már túl nagy az AI tévedése)
-                {'Grid/CellSize': '0.05'},           # 5 cm-es felbontás (kisebb zaj, átláthatóbb térkép)
-                {'Cloud/NoiseFilteringRadius': '0.1'}, # Kiszűri a "lebegő" magányos pontokat
-                {'Cloud/NoiseFilteringMinNeighbors': '5'}, # Csak akkor tart meg egy pontot, ha vannak társai (tisztább kontúrok)      
+                {'Grid/RangeMax': '4.0'},            
+                {'Grid/CellSize': '0.05'},           
+                {'Cloud/NoiseFilteringRadius': '0.1'}, 
+                {'Cloud/NoiseFilteringMinNeighbors': '5'},    
                 
-                # --- SŰRŰBB TÉRKÉP PONTOK (A simább piros vonalért) ---
-                {'RGBD/LinearUpdate': '0.01'},  # 10 cm helyett 1 cm-enként rakjon le egy pontot
-                {'RGBD/AngularUpdate': '0.01'}, # 10 fok helyett már apró fordulásnál is rögzítsen
-                {'Rtabmap/DetectionRate': '20'},# Ne várjon, pörgesse a térképfrissítést (alapból csak 1-5 Hz)  
+                # <--- A SZAGGATÁS MEGSZÜNTETÉSE (A NAGYAGY LENYUGTATÁSA) ---
+                {'Rtabmap/DetectionRate': '1'},   # <--- 20-ról 1-re! Csak másodpercenként 1x frissíti a térképet.
+                {'RGBD/LinearUpdate': '0.1'},     # <--- 0.01-ről 0.1-re! Csak 10 centinként rak le új csomópontot (Node).
+                {'RGBD/AngularUpdate': '0.1'},    # <--- 0.01-ről 0.1-re! Csak durva fordulásoknál optimalizál.
                 
-                # --- TÉRKÉP TISZTÍTÁS ÉS SUGÁRKÖVETÉS ---
-                {'Grid/3D': 'False'},               # Legyen igazi 3D-s a térkép rácsozata
-                {'Grid/RayTracing': 'False'},       # Lőjön sugarakat a "szellemek" kitörléséhez
-                {'Reg/Force3DoF': 'true'},  # Kényszerített 2D mód: X, Y és Z-forgás (Yaw) engedélyezett csak!
+                {'Grid/3D': 'False'},               
+                {'Grid/RayTracing': 'False'},       
+                {'Reg/Force3DoF': 'true'}
                 
-                # Szigorúbb Vizuális Odometria beállítások
-                {'Vis/MinInliers': '15'},       # Minimum ennyi fix pont kell a mozgás felismeréséhez
-                {'Vis/EstimationType': '0'},     # 3D->3D odometria számítás
+                # Kivettük a 'Vis/...' paramétereket innét, mert azoknak az Odometriában a helyük, itt csak zavarták a gépet.
             ],
             remappings=[
-                ('rgbd_image', '/rgbd_image'), # A szinkronizátortól kapja a jelet!
-                #('odom', '/odom/kinematic'),   # A lábak nyers odometriája (EKF helyett)
-                ('odom', '/odom/filtered'),     # A szűrt odometria (EKF után)
+                ('rgbd_image', '/rgbd_image'), 
+                ('odom', '/odom/filtered'),     
                 ('imu', '/imu/data'),         
             ],
             arguments=['-d'] 

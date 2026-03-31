@@ -326,9 +326,9 @@ class HexapodController(Node):
 
         # --- ÚJ: BIZONYTALANSÁG (KOVARIANCIA) BEÁLLÍTÁSA ---
         # Ráerőltetjük a generált üzenetre a bizonytalanságot, mielőtt kimenne a hálózatra!
-        odom_msg.twist.covariance[0] = 0.5   # X tengelyű sebesség bizonytalansága
-        odom_msg.twist.covariance[7] = 0.5   # Y tengelyű sebesség bizonytalansága
-        odom_msg.twist.covariance[35] = 0.2  # Forgási sebesség bizonytalansága
+        odom_msg.twist.covariance[0] = 0.05   # X tengelyű sebesség bizonytalansága
+        odom_msg.twist.covariance[7] = 0.05   # Y tengelyű sebesség bizonytalansága
+        odom_msg.twist.covariance[35] = 0.05  # Forgási sebesség bizonytalansága
 
         # Publikálás a hálózatra
         self.odom_pub.publish(odom_msg)

@@ -104,7 +104,7 @@ class DepthVisionNode(Node):
             # BIZTONSÁGI VÁGÁS: Megakadályozza az uint16 átfordulást (65 méteres tüskéket)!
             norm_depth = np.clip(norm_depth, 0.0, 1.0)
             
-            min_dist_mm = 600.0  # 20 centinél közelebbi dolgokat levágja
+            min_dist_mm = 200.0  # 20 centinél közelebbi dolgokat levágja
             max_dist_mm = 4000.0 # 4 méterre nyomja össze a teret (beltérre tökéletes)
             pseudo_metric_depth = (1.0 - norm_depth) * (max_dist_mm - min_dist_mm) + min_dist_mm
             
