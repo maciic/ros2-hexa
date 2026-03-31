@@ -49,13 +49,13 @@ def generate_launch_description():
             output='screen'
         ),
 
-        ## 5. AI Vision Node a kamerakép feldolgozásához
-        # Node(
-        #     package='my_hexapod',
-        #     executable='ai_vision_node',
-        #     name='ai_vision_node',
-        #     output='screen'
-        # ),
+        # 5. AI Vision Node a kamerakép feldolgozásához
+        Node(
+            package='my_hexapod',
+            executable='ai_vision_node',
+            name='ai_vision_node',
+            output='screen'
+        ),
 
         # 6. Joy Node (Kiolvassa a PS5 kontrollert a Bluetooth-ról)
         Node(
@@ -195,7 +195,7 @@ def generate_launch_description():
             ]
         ),
         
-        # 15.5 A LÁTÓIDEG: Vizuális Odometria (VIO) - VAJSIMA MOZGÁS
+        # 15.5 A LÁTÓIDEG: Vizuális Odometria (VIO)
         Node(
             package='rtabmap_odom',
             executable='rgbd_odometry',
@@ -205,16 +205,15 @@ def generate_launch_description():
                 {'publish_tf': False},
                 {'subscribe_rgbd': True},
                 
-                {'guess_frame_id': 'odom'},   
-                {'Odom/GuessMotion': 'true'}, 
-                {'Reg/Force3DoF': 'true'},     
+                # A decimation-t KIVETTÜNK, mert az alap kép már kicsi!
                 
-                {'Vis/CorType': '1'},         
-                {'Vis/MaxFeatures': '200'},   
-                {'Vis/CorGuessWinSize': '40'}, 
-                
-                # <--- A MOZGÁS KISIMÍTÁSA ---
-                {'Odom/Strategy': '1'}  # CSERE 0-ról 1-re: Frame-to-Frame mód! Nem a térképhez, csak az előző képkockához méri magát. Nagyon gyors, nem szaggat!
+                {'Vis/CorType': '1'},          
+                {'Vis/MaxFeatures': '150'},    # <--- ÚJ: 300 helyett 150 pont. Bőven elég a kis képen, és felezi a matekot!
+                {'Vis/CorGuessWinSize': '20'}, # <--- ÚJ: Kisebb képen a pixelek fizikailag kevesebbet ugranak, így a keresési területet is a felére vettük!
+                {'Odom/Strategy': '0'},
+                # --- ÚJ: BERAGADÁS ELLENI VÉDELEM ---
+                {'Odom/ResetCountdown': '1'},  # Ha 1 frame-ig elveszett, azonnal nullázza magát és újraindul!
+                {'Odom/KeyFrameThr': '0.5'}    # Gyakrabban frissíti a referenciaképet (alapból 0.3), így nehezebben veszíti el a fonalat.
             ],
             remappings=[
                 ('rgbd_image', '/rgbd_image'),

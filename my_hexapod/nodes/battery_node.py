@@ -82,10 +82,9 @@ class BatteryNode(Node):
                 self.get_logger().warn(s_msg.data)
         else: 
             s_msg.data = f"Akku OK: {voltage:.2f}V ({int(pct)}%)"
-            # Ide be is tehetünk egy kis trükköt, hogy ne spammelje tele a konzolt 2 másodpercenként:
-            # Csak akkor írja ki az INFO-t, ha hardveres, és te akarod (de hagyhatjuk simán is)
             if self.hardware_available: 
-                self.get_logger().info(s_msg.data)
+                pass
+                #self.get_logger().info(s_msg.data)
                 
         self.status_pub.publish(s_msg)
 
