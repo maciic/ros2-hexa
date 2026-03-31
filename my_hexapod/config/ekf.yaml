@@ -1,0 +1,46 @@
+/**:
+  ros__parameters:
+    frequency: 30.0
+    sensor_timeout: 0.1
+    two_d_mode: false
+    transform_time_offset: 0.0
+    transform_timeout: 0.0
+    print_diagnostics: true
+    debug: false
+    publish_tf: true
+
+    map_frame: map
+    odom_frame: odom         # <-- VISSZAÍRVA
+    base_link_frame: base_link
+    world_frame: odom        # <-- VISSZAÍRVA
+
+    # 1. SZENZOR: A LÁBAK (Kinematika)
+    odom0: /odom/kinematic
+    odom0_config: [true,  true,  true,
+                   false, false, true,
+                   true,  true,  true,
+                   false, false, false,
+                   false, false, false]
+    odom0_queue_size: 10
+    odom0_differential: false
+
+    # 2. SZENZOR: AZ IMU (Belső fül)
+    imu0: /imu/data
+    imu0_config: [false, false, false,
+                  true,  true,  false,
+                  false, false, false,
+                  true,  true,  false,
+                  false, false, false]
+    imu0_queue_size: 10
+    imu0_relative: true
+
+    # 3. ÚJ SZENZOR: A KAMERA (Vizuális Odometria)
+    odom1: /odom/visual
+    # A kamerától beolvassuk az X, Y haladási sebességet. Ő fogja megállítani a csúszást!
+    odom1_config: [false, false, false,
+                   false, false, false,
+                   true,  true,  false,
+                   false, false, false,
+                   false, false, false]
+    odom1_queue_size: 10
+    odom1_differential: false

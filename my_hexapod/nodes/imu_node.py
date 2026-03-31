@@ -31,6 +31,10 @@ class IMUNode(Node):
                 # A 0x6B (PWR_MGMT_1) regiszterbe 0-t írunk, hogy kikapcsoljuk az alvó módot
                 self.bus.write_byte_data(self.MPU_ADDR, 0x6B, 0x00)
                 time.sleep(0.1)
+                # --- ÚJ: HARDVERES ZAJSZŰRŐ BEKAPCSOLÁSA (DLPF) ---
+                # A 0x1A regiszterbe 0x05-öt írunk. Ez egy 10Hz-es fizikai szűrő, 
+                # ami levágja a motorok és a környezet apró magasfrekvenciás remegéseit!
+                self.bus.write_byte_data(self.MPU_ADDR, 0x1A, 0x05)
                 
                 self.get_logger().info("✅ GY-521 (MPU6050) IMU sikeresen felébresztve a 0x68 címen!")
             except Exception as e:
@@ -79,6 +83,14 @@ class IMUNode(Node):
             gx = math.radians(gyro_x / 131.0)
             gy = math.radians(gyro_y / 131.0)
             gz = math.radians(gyro_z / 131.0)
+
+            # --- ÚJ: SZOFTVERES KÜSZÖB (DEADBAND) ---
+            # Ha a forgási sebesség kisebb, mint kb. 1.7 fok/másodperc (0.03 rad/s),
+            # akkor kerekítsük le nullára, hogy ne remegjen a szimuláció a zajtól!
+            deadband = 0.06
+            if abs(gx) < deadband: gx = 0.0
+            if abs(gy) < deadband: gy = 0.0
+            if abs(gz) < deadband: gz = 0.0
 
             # 3. ROS2 ÜZENET ÖSSZEÁLLÍTÁSA
             msg = Imu()

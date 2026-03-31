@@ -49,13 +49,13 @@ def generate_launch_description():
             output='screen'
         ),
 
-        # 5. AI Vision Node a kamerakép feldolgozásához
-        Node(
-            package='my_hexapod',
-            executable='ai_vision_node',
-            name='ai_vision_node',
-            output='screen'
-        ),
+        ## 5. AI Vision Node a kamerakép feldolgozásához
+        # Node(
+        #     package='my_hexapod',
+        #     executable='ai_vision_node',
+        #     name='ai_vision_node',
+        #     output='screen'
+        # ),
 
         # 6. Joy Node (Kiolvassa a PS5 kontrollert a Bluetooth-ról)
         Node(
@@ -115,7 +115,9 @@ def generate_launch_description():
             name='imu_filter',
             parameters=[
                 {'use_mag': False},
-                {'publish_tf': False}
+                {'publish_tf': False},
+                {'gain': 0.05},       # <--- ÚJ: Alapértelmezés 0.1. Az 0.01 drasztikusan lecsillapítja a remegést!
+                {'zeta': 0.005},       # <--- ÚJ: Megakadályozza a giroszkóp driftelését a háttérben.
             ]
         ),
 
@@ -127,7 +129,7 @@ def generate_launch_description():
             parameters=[
                 {'video_device': '/dev/video50'},
                 # Hagyd meg a saját, jó útvonaladat a YAML-hoz!
-                {'camera_info_url': 'file:///hexapod_workspace/src/ros2-hexa/my_hexapod/config/camera_info.yaml'},
+                {'camera_info_url': 'file:///ros_ws/src/ros2-hexa/my_hexapod/config/camera_info.yaml'},
                 
                 # --- ÚJ: FORMATÁLÁS AZ AI SZÁMÁRA ---
                 {'output_encoding': 'rgb8'},   # Kijavítja a "Could not convert" errort!
@@ -151,37 +153,116 @@ def generate_launch_description():
             name='imu_static_tf',
             arguments=['0.0', '0.0', '0.048', '0.0', '0.0', '0.0', 'base_link', 'imu_link'] 
         ),
+        
+        # 13.8 Kálmán-szűrő (Szenzorfúzió: Lábak + IMU + Kamera)
+        Node(
+            package='robot_localization',
+            executable='ekf_node',
+            name='ekf_filter_node',
+            output='screen',
+            parameters=[
+                '/ros_ws/src/ros2-hexa/my_hexapod/config/ekf.yaml'
+            ],
+            remappings=[
+                ('odometry/filtered', '/odom/filtered') # Ide küldi a tiszta adatot
+            ]
+        ),
 
-        # 14. RTAB-Map (A Vizuális Térképező és Odometria korrigáló AI)
+        # 14. Az új AI Mélységérzékelő (Pszeudo RGB-D a Hailo chipről)
+        Node(
+            package='my_hexapod',
+            executable='depth_vision_node',
+            name='depth_vision_node',
+            output='screen'
+        ),
+
+        # 15. RGB-D Szinkronizátor (Összepárosítja a színes képet és a mélységet)
+        Node(
+            package='rtabmap_sync',
+            executable='rgbd_sync',
+            name='rgbd_sync',
+            parameters=[
+                {'approx_sync': True},
+                {'approx_sync_max_interval': 0.05},
+                {'queue_size': 20}
+            ],
+            remappings=[
+                ('rgb/image', '/image_raw'),
+                ('depth/image', '/depth/image_raw'),
+                ('rgb/camera_info', '/camera_info'),
+                ('rgbd_image', '/rgbd_image') # Ezt a kombinált csomagot küldi tovább
+            ]
+        ),
+        
+        # 15.5 AZ ÚJ LÁTÓIDEG: Vizuális Odometria (VIO)
+        Node(
+            package='rtabmap_odom',
+            executable='rgbd_odometry',
+            name='rgbd_odometry',
+            parameters=[
+                {'frame_id': 'base_link'},
+                {'publish_tf': False},
+                {'subscribe_rgbd': True},     
+                
+                # --- VÁLTOZTATÁSOK A SZIKLASZILÁRD FÉKHEZ ---
+                {'guess_frame_id': 'odom'},   
+                {'Odom/GuessMotion': 'false'},    # <--- ÚJ: NE puskázzon a lábakról! Ha áll a kép, mondja azt, hogy állunk.
+                
+                {'Vis/MaxFeatures': '600'},       # <--- ÚJ: 400 kevés volt, 1000 sok. A 600 az arany középút.
+                {'Vis/EstimationType': '0'},      # <--- ÚJ: Vissza 3D->3D módba! Ez sokkal jobban bírja az AI "lélegző" mélységképét.
+                {'Odom/UpdateTargetLinear': '0.01'} 
+            ],
+            remappings=[
+                ('rgbd_image', '/rgbd_image'),
+                ('imu', '/imu/data'),
+                ('odom', '/odom/visual')  
+            ]
+        ),
+
+        # 16. RTAB-Map (Immár igazi 3D VIO / RGB-D MÓDBAN!)
         Node(
             package='rtabmap_slam', 
             executable='rtabmap',
             name='rtabmap',
             parameters=[
-                {'subscribe_depth': False},
-                {'subscribe_rgb': True},
+                # Kikapcsoljuk a külön csatornákat, mert most már az "egybecsomagolt" rgbd_image-t használjuk
+                {'subscribe_depth': False}, 
+                {'subscribe_rgb': False},   
+                {'subscribe_rgbd': True},   # <--- EZ KAPCSOLJA BE A 3D MÓDOT
+                
                 {'subscribe_odom': True},
-                
-                # --- AZ IMU INTEGRÁCIÓ PARAMÉTEREI ---
-                {'subscribe_imu': True},       # BEKAPCSOLÓ GOMB: Figyeljen a belső fülre!
-                {'wait_imu_to_init': True},    # Induláskor várja meg az első IMU adatot, ne induljon vakon.
-                
+                {'subscribe_imu': True},
+                {'wait_imu_to_init': True},    
                 
                 {'frame_id': 'base_link'},
                 {'odom_frame_id': 'odom'},
                 {'approx_sync': True},         
-                {'queue_size': 20},            
-                {'RGBD/AngularUpdate': '0.01'},
-                {'RGBD/LinearUpdate': '0.01'},
+                {'queue_size': 20},    
                 
-                # --- TELJESÍTMÉNY MÓD ---
-                {'Rtabmap/DetectionRate': '10'} # 2 Hz helyett 10 Hz: Folyamatos, sima kék vonal!
+                {'Grid/RangeMax': '4.0'},            # Ne rajzoljon le semmit, ami 5 méternél messzebb van (ott már túl nagy az AI tévedése)
+                {'Grid/CellSize': '0.05'},           # 5 cm-es felbontás (kisebb zaj, átláthatóbb térkép)
+                {'Cloud/NoiseFilteringRadius': '0.1'}, # Kiszűri a "lebegő" magányos pontokat
+                {'Cloud/NoiseFilteringMinNeighbors': '5'}, # Csak akkor tart meg egy pontot, ha vannak társai (tisztább kontúrok)      
+                
+                # --- SŰRŰBB TÉRKÉP PONTOK (A simább piros vonalért) ---
+                {'RGBD/LinearUpdate': '0.01'},  # 10 cm helyett 1 cm-enként rakjon le egy pontot
+                {'RGBD/AngularUpdate': '0.01'}, # 10 fok helyett már apró fordulásnál is rögzítsen
+                {'Rtabmap/DetectionRate': '20'},# Ne várjon, pörgesse a térképfrissítést (alapból csak 1-5 Hz)  
+                
+                # --- TÉRKÉP TISZTÍTÁS ÉS SUGÁRKÖVETÉS ---
+                {'Grid/3D': 'False'},               # Legyen igazi 3D-s a térkép rácsozata
+                {'Grid/RayTracing': 'False'},       # Lőjön sugarakat a "szellemek" kitörléséhez
+                {'Reg/Force3DoF': 'true'},  # Kényszerített 2D mód: X, Y és Z-forgás (Yaw) engedélyezett csak!
+                
+                # Szigorúbb Vizuális Odometria beállítások
+                {'Vis/MinInliers': '15'},       # Minimum ennyi fix pont kell a mozgás felismeréséhez
+                {'Vis/EstimationType': '0'},     # 3D->3D odometria számítás
             ],
             remappings=[
-                ('rgb/image', '/image_raw'),
-                ('rgb/camera_info', '/camera_info'),
-                ('odom', '/odom/kinematic'),
-                ('imu', '/imu/data')           # Itt kapja meg a fizikai adatot
+                ('rgbd_image', '/rgbd_image'), # A szinkronizátortól kapja a jelet!
+                #('odom', '/odom/kinematic'),   # A lábak nyers odometriája (EKF helyett)
+                ('odom', '/odom/filtered'),     # A szűrt odometria (EKF után)
+                ('imu', '/imu/data'),         
             ],
             arguments=['-d'] 
         ),
