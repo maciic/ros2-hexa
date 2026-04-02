@@ -32,26 +32,36 @@ class AIVisionNode(Node):
         
         # Példányosítjuk az Állapotgépet
         self.state_machine = AIStateMachine()
-
-        self.get_logger().info("🧠 Hailo-8 POSE AI indítása...")
-        self.stack = ExitStack()
         
+        self.hailo_active = False # <--- ÚJ LOGIKA
+        
+        self.get_logger().info("🧠 Hailo-8 POSE Node elindult, várakozás parancsra...")
+
+    def mode_callback(self, msg):
+        self.current_ai_mode = msg.data
+        if self.current_ai_mode == "STANDBY":
+            if hasattr(self, 'state_machine'):
+                self.state_machine.last_mode = "STANDBY"
+                self.state_machine._reset_memory()
+            self.deactivate_hailo()
+        else:
+            self.activate_hailo()
+
+    def activate_hailo(self):
+        if self.hailo_active: return
+        self.get_logger().info("Ébresztés: Hailo-8 POSE modell betöltése a chipre...")
+        self.stack = ExitStack()
         try:
+            # IDE JÖN AZ EREDETI TRY BLOKK AZ __init__-ből
             script_dir = os.path.dirname(os.path.realpath(__file__))
             hef_path = os.path.join(script_dir, "..", "yolov8s_pose.hef")
             
-            if not os.path.exists(hef_path):
-                self.get_logger().error(f"❌ NEM TALÁLOM A POSE HEF FÁJLT: {hef_path}")
-                return
-
             self.hef = HEF(hef_path)
             self.target = self.stack.enter_context(VDevice())
-            
             self.configure_params = ConfigureParams.create_from_hef(hef=self.hef, interface=HailoStreamInterface.PCIe)
             self.network_groups = self.target.configure(self.hef, self.configure_params)
             self.network_group = self.network_groups[0]
             self.network_group_params = self.network_group.create_params()
-            
             self.input_vstreams_params = InputVStreamParams.make(self.network_group, format_type=FormatType.UINT8)
             self.output_vstreams_params = OutputVStreamParams.make(self.network_group, format_type=FormatType.FLOAT32)
             
@@ -59,30 +69,26 @@ class AIVisionNode(Node):
                 InferVStreams(self.network_group, self.input_vstreams_params, self.output_vstreams_params)
             )
             self.stack.enter_context(self.network_group.activate(self.network_group_params))
-            
             self.input_name = self.hef.get_input_vstream_infos()[0].name
             
             shape = self.hef.get_input_vstream_infos()[0].shape
             self.model_h, self.model_w = (shape[1], shape[2]) if len(shape) == 4 else (640, 640)
-                
-            self.get_logger().info(f"✅ LÁTÓIDEG KÉSZEN ÁLL! ({self.model_w}x{self.model_h})")
             
+            self.hailo_active = True
+            self.get_logger().info(f"✅ LÁTÓIDEG AKTÍV! ({self.model_w}x{self.model_h})")
         except Exception as e:
-            self.get_logger().error(f"❌ HAILO INICIALIZÁLÁSI HIBA: {e}")
+            self.get_logger().error(f"❌ HAILO ÉBRESZTÉSI HIBA: {e}")
             self.stack.close()
 
-    def mode_callback(self, msg):
-        self.current_ai_mode = msg.data
-        
-        # --- ÚJ: Szelektív amnézia altatáskor ---
-        # Ha a robot megáll (STANDBY), azonnal nullázzuk a State Machine memóriáját is!
-        if self.current_ai_mode == "STANDBY" and hasattr(self, 'state_machine'):
-            self.state_machine.last_mode = "STANDBY"
-            self.state_machine._reset_memory()
+    def deactivate_hailo(self):
+        if not self.hailo_active: return
+        self.get_logger().info("Altatás: Hailo chip felszabadítása (YOLO)...")
+        self.stack.close() # Ez a lényeg! Elengedi a VDevice-t!
+        self.hailo_active = False
 
     def image_callback(self, msg):
         # --- POWER GATING: Ha Standby, azonnal eldobja a képet, a chip pihen! ---
-        if self.is_processing or self.current_ai_mode == "STANDBY":
+        if not self.hailo_active or self.is_processing or self.current_ai_mode == "STANDBY":
             return
             
         self.is_processing = True
@@ -156,8 +162,9 @@ class AIVisionNode(Node):
             
             if do_visualize:
                 overlay_frame = cv2.cvtColor(frame_original, cv2.COLOR_RGB2BGR)
+                # A font scale-t levettük 0.8-ról 0.4-re, a vastagságot 2-ről 1-re a 320x240 miatt!
                 cv2.putText(overlay_frame, f"MODE: {self.current_ai_mode} | CONF: {global_max_conf*100:.0f}%", 
-                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+                            (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
 
                 if best_person_keypoints is not None:
                     for i, kp in best_person_keypoints.items():

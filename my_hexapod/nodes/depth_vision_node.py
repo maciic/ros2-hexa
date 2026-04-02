@@ -1,12 +1,12 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
+from std_msgs.msg import String # Új import!
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
 import os
 from contextlib import ExitStack
-
 from hailo_platform import (HEF, VDevice, HailoStreamInterface, ConfigureParams,
                             InputVStreamParams, OutputVStreamParams, FormatType, InferVStreams)
 
@@ -16,72 +16,71 @@ class DepthVisionNode(Node):
         
         self.bridge = CvBridge()
         self.image_sub = self.create_subscription(Image, 'image_raw', self.image_callback, 1)
+        self.mode_sub = self.create_subscription(String, 'vio_current_mode', self.mode_callback, 10)
         self.depth_pub = self.create_publisher(Image, 'depth/image_raw', 1)
         
+        self.hailo_active = False
         self.is_processing = False
-        self.is_ready = False # <-- BIZTONSÁGI ZÁR
-        self.model_w = 224    # <-- ALAPÉRTELMEZETT ÉRTÉK
-        self.model_h = 224    # <-- ALAPÉRTELMEZETT ÉRTÉK
-        
+        self.model_w, self.model_h = 224, 224
         self.stack = ExitStack()
-        
-        self.get_logger().info("🌊 Hailo DepthAnything AI indítása...")
-        
+
+        self.get_logger().info("🌊 Depth Node betöltve, várakozás aktiválásra...")
+
+    def mode_callback(self, msg):
+        if msg.data == "ACTIVE" and not self.hailo_active:
+            self.activate_hailo()
+        elif msg.data == "STANDBY" and self.hailo_active:
+            self.deactivate_hailo()
+
+    def activate_hailo(self):
         try:
+            self.get_logger().info("🚀 Hailo Depth chip ébresztése...")
             script_dir = os.path.dirname(os.path.realpath(__file__))
             hef_path = os.path.join(script_dir, "..", "depth_anything_vits.hef")
             
             self.hef = HEF(hef_path)
             self.target = self.stack.enter_context(VDevice())
-            
+            # (Itt jön a többi konfigurációs kód, amit korábban is használtál...)
             self.configure_params = ConfigureParams.create_from_hef(hef=self.hef, interface=HailoStreamInterface.PCIe)
             self.network_groups = self.target.configure(self.hef, self.configure_params)
             self.network_group = self.network_groups[0]
             self.network_group_params = self.network_group.create_params()
-            
             self.input_vstreams_params = InputVStreamParams.make(self.network_group, format_type=FormatType.UINT8)
             self.output_vstreams_params = OutputVStreamParams.make(self.network_group, format_type=FormatType.FLOAT32)
-            
             self.infer_pipeline = self.stack.enter_context(
                 InferVStreams(self.network_group, self.input_vstreams_params, self.output_vstreams_params)
             )
             self.stack.enter_context(self.network_group.activate(self.network_group_params))
-            
             self.input_name = self.hef.get_input_vstream_infos()[0].name
             self.output_name = self.hef.get_output_vstream_infos()[0].name
             
-            shape = self.hef.get_input_vstream_infos()[0].shape
-            if len(shape) == 4:
-                self.model_h, self.model_w = shape[1], shape[2]
-            elif len(shape) == 3:
-                self.model_h, self.model_w = shape[0], shape[1]
-                
-            self.is_ready = True # <-- SIKERES INDULÁS, KINYITJUK A ZÁRAT!
-            
-            self.smooth_d_min = None
-            self.smooth_d_max = None
-            
-            self.get_logger().info(f"✅ TÉRBELI LÁTÁS AKTÍV! ({self.model_w}x{self.model_h})")
-            
+            self.hailo_active = True
+            self.smooth_d_min, self.smooth_d_max = None, None
+            self.get_logger().info("✅ Depth AI kész!")
         except Exception as e:
-            # HA ITT ELHASAL, LÁTNI FOGJUK A PONTOS OKOT:
-            self.get_logger().error(f"❌ HAILO MÉLYSÉG INICIALIZÁLÁSI HIBA: {e}")
-            self.stack.close()
+            self.get_logger().error(f"Hiba: {e}")
+
+    def deactivate_hailo(self):
+        self.get_logger().info("💤 Depth AI altatása, chip felszabadítása...")
+        self.stack.close()
+        self.hailo_active = False
 
     def image_callback(self, msg):
-        # HA NEM SIKERÜLT AZ INDULÁS, ELDOBJUK A KÉPET!
-        if not self.is_ready or self.is_processing:
+        if not self.hailo_active or self.is_processing:
             return
             
         self.is_processing = True
 
         try:
+            # 1. Eredeti méretek kimentése!
             frame_original = self.bridge.imgmsg_to_cv2(msg, "rgb8") 
-            orig_h, orig_w = frame_original.shape[:2]
+            orig_h, orig_w = frame_original.shape[:2]  # <--- EZ A SOR MARAD!
+            
+            # 2. AI méretre nyomás
             input_img = cv2.resize(frame_original, (self.model_w, self.model_h))
             
+            # 3. Kiszámolja a Hailo
             infer_results = self.infer_pipeline.infer({self.input_name: np.expand_dims(input_img, axis=0)})
-            
             raw_depth = infer_results[self.output_name][0]
             if len(raw_depth.shape) == 3:
                 raw_depth = np.squeeze(raw_depth, axis=2)
@@ -108,11 +107,13 @@ class DepthVisionNode(Node):
             max_dist_mm = 4000.0 # 4 méterre nyomja össze a teret (beltérre tökéletes)
             pseudo_metric_depth = (1.0 - norm_depth) * (max_dist_mm - min_dist_mm) + min_dist_mm
             
+            # 4. VISSZANAGYÍTÁS AZ EREDETI MÉRETRE!
             depth_resized = cv2.resize(pseudo_metric_depth, (orig_w, orig_h), interpolation=cv2.INTER_LINEAR)
             depth_16u = depth_resized.astype(np.uint16)
             
+            # 5. Publikálás a TÖKÉLETES időbélyeggel
             depth_msg = self.bridge.cv2_to_imgmsg(depth_16u, encoding="16UC1")
-            depth_msg.header = msg.header 
+            depth_msg.header = msg.header  # A szinkronizáció lelke!
             self.depth_pub.publish(depth_msg)
 
         except Exception as e:

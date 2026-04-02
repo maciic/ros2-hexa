@@ -11,6 +11,7 @@ class PS5MapperNode(Node):
         self.joy_sub = self.create_subscription(Joy, 'joy', self.joy_callback, 10)
         self.vel_pub = self.create_publisher(Twist, 'cmd_vel_joy', 10) 
         self.cmd_pub = self.create_publisher(String, 'robot_command', 10)
+        self.ui_pub = self.create_publisher(String, 'ui/current_mode', 10)
         
         # --- ÚJ: D-pad hozzáadva gombként ---
         self.BUTTON_MAP = {
@@ -18,6 +19,7 @@ class PS5MapperNode(Node):
             1: "CIRCLE",    # ANIM_WAVE / AI_GESTURE
             2: "SQUARE",    # ANIM_ATTACK / AI_FOLLOW
             3: "TRIANGLE",  # AI_SENTRY
+            4: "SHARE",     # Odometria bekapcsolása
             6: "OPTIONS",   # Módváltó gomb!
             10: "R1",       # SIT
             11: "DPAD_UP",  # Tripod
@@ -30,6 +32,15 @@ class PS5MapperNode(Node):
         self.current_mode = "MANUAL" 
         
         self.get_logger().info("🎮 PS5 Mapper Node elindult! D-Pad járásmódok aktiválva.")
+        
+        # Kezdeti állapot kiküldése (kis késleltetéssel, hogy a ROS hálózat felálljon)
+        self.timer = self.create_timer(1.0, self.publish_ui_state)
+
+    def publish_ui_state(self):
+        """ Folyamatosan küldi a Foxglove-nak, hogy milyen módban vagyunk """
+        msg = String()
+        msg.data = self.current_mode
+        self.ui_pub.publish(msg)
 
     def joy_callback(self, msg):
         # 1. GOMBOK FELDOLGOZÁSA
@@ -44,8 +55,8 @@ class PS5MapperNode(Node):
                 
         self.last_buttons = list(msg.buttons)
         
-        # 2. ANALÓG KAROK (Csak MANUAL módban)
-        if self.current_mode == "MANUAL":
+        # 2. ANALÓG KAROK (Csak MANUAL és VIO módban)
+        if self.current_mode in ["MANUAL", "VIO"]:
             twist = Twist()
             twist.linear.x = msg.axes[1]   
             twist.linear.y = msg.axes[0]   
@@ -64,9 +75,20 @@ class PS5MapperNode(Node):
             cmd_msg.data = "STOP"
             
         elif btn_name == "OPTIONS":
+            if self.current_mode == "VIO":
+                self.get_logger().warn("⚠️ Előbb kapcsold ki a VIO módot (SHARE gomb)!")
+                return
             self.current_mode = "AI" if self.current_mode == "MANUAL" else "MANUAL"
             cmd_msg.data = f"SYS_MODE_{self.current_mode}"
             self.get_logger().info(f"🔄 Kontroller átváltva: {self.current_mode} módba!")
+
+        elif btn_name == "SHARE":
+            if self.current_mode == "AI":
+                self.get_logger().warn("⚠️ Előbb kapcsold ki az AI módot (OPTIONS gomb)!")
+                return
+            self.current_mode = "VIO" if self.current_mode == "MANUAL" else "MANUAL"
+            cmd_msg.data = f"SYS_MODE_{self.current_mode}"
+            self.get_logger().info(f"👁️ Odometria/VIO átváltva: {self.current_mode} módba!")
 
         elif self.current_mode == "MANUAL":
             # Animációk
@@ -87,6 +109,7 @@ class PS5MapperNode(Node):
             else: return
             
         self.cmd_pub.publish(cmd_msg)
+        self.publish_ui_state()  # Azonnal frissítjük a UI-t is
         self.get_logger().info(f"📤 Parancs kiküldve: {cmd_msg.data}")
 
 def main(args=None):

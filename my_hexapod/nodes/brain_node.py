@@ -2,6 +2,8 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
+from std_srvs.srv import Empty
+import rclpy.client
 
 class HexapodBrainNode(Node):
     def __init__(self):
@@ -30,6 +32,10 @@ class HexapodBrainNode(Node):
         
         # ÚJ: Ezen a csatornán mondjuk meg az AI Node-nak, hogy mit csináljon a képpel!
         self.ai_mode_pub = self.create_publisher(String, 'ai_current_mode', 10) 
+        self.vio_mode_pub = self.create_publisher(String, 'vio_current_mode', 10)
+        
+        self.rtab_reset_client = self.create_client(Empty, '/rtabmap/reset')
+        self.odom_reset_client = self.create_client(Empty, '/odom/reset')
         
         self.timer = self.create_timer(1.0 / 50.0, self.timer_callback)
         self.get_logger().info("Agy 3.0 (AI Menürendszerrel) online! 🧠")
@@ -59,20 +65,34 @@ class HexapodBrainNode(Node):
             self.control_mode = cmd.replace("SYS_MODE_", "")
             self.get_logger().info(f"⚙️ Rendszer átállítva: {self.control_mode} vezérlésre")
             
-            # --- ÚJ: Fantom sebességek törlése módváltáskor! ---
             self.joy_vel = Twist()
             self.ai_vel = Twist()
             
             if self.control_mode == "AI":
                 self.active_ai_mode = "STANDBY"
                 self.ai_mode_pub.publish(String(data=self.active_ai_mode))
+                self.vio_mode_pub.publish(String(data="STANDBY")) # VIO alszik
+                self.current_state = "IDLE"
+                
+            elif self.control_mode == "VIO":
+                self.active_ai_mode = "STANDBY"
+                self.ai_mode_pub.publish(String(data=self.active_ai_mode)) # AI YOLO kikapcs
+                self.vio_mode_pub.publish(String(data="ACTIVE"))         # VIO Depth bekapcs!
                 self.current_state = "IDLE"
             
             elif self.control_mode == "MANUAL":
                 self.active_ai_mode = "STANDBY"
-                self.ai_mode_pub.publish(String(data=self.active_ai_mode)) 
+                self.ai_mode_pub.publish(String(data=self.active_ai_mode)) # AI alszik
+                self.vio_mode_pub.publish(String(data="STANDBY")) # VIO alszik
                 self.current_state = "IDLE"
-                self.active_animation = "NONE" 
+                self.active_animation = "NONE"
+                
+                # ---> ÚJ: Töröljük a memóriát <---
+                self.get_logger().info("🧹 VIO kikapcsolva: Térkép és Odometria memóriájának törlése...")
+                if self.rtab_reset_client.wait_for_service(timeout_sec=1.0):
+                    self.rtab_reset_client.call_async(Empty.Request())
+                if self.odom_reset_client.wait_for_service(timeout_sec=1.0):
+                    self.odom_reset_client.call_async(Empty.Request())
             
         # 2. Vészmegállás (Kizárólag a PS5 "X" gombja küldi)
         elif cmd == "STOP":
@@ -114,7 +134,7 @@ class HexapodBrainNode(Node):
             self.get_logger().info(f"🎬 Animáció indítása: {self.active_animation}")
 
     def timer_callback(self):
-        current_input_vel = self.joy_vel if self.control_mode == "MANUAL" else self.ai_vel
+        current_input_vel = self.ai_vel if self.control_mode == "AI" else self.joy_vel
         
         if self.current_state != "ANIMATION":
             # Mozgás érzékelése

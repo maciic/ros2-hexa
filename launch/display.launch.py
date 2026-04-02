@@ -181,6 +181,7 @@ def generate_launch_description():
             package='rtabmap_sync',
             executable='rgbd_sync',
             name='rgbd_sync',
+            arguments=['--ros-args', '--log-level', 'ERROR'],
             parameters=[
                 # Mivel a Python kódod lemásolja a headert, az időbélyegek hajszálpontosan egyeznek!
                 # Ez a beállítás (approx_sync: False) 0-ra csökkenti a szinkronizátor CPU terhelését!
@@ -200,6 +201,7 @@ def generate_launch_description():
             package='rtabmap_odom',
             executable='rgbd_odometry',
             name='rgbd_odometry',
+            arguments=['--ros-args', '--log-level', 'ERROR'],
             parameters=[
                 {'frame_id': 'base_link'},
                 {'publish_tf': False},
@@ -262,6 +264,6 @@ def generate_launch_description():
                 ('odom', '/odom/filtered'),     
                 ('imu', '/imu/data'),         
             ],
-            arguments=['-d'] 
+            arguments=['-d', '--ros-args', '--log-level', 'ERROR'] 
         ),
     ])
