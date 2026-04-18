@@ -76,7 +76,7 @@ docker build -t hexapod_ai_os .
 # Docker pack futtatása teszthez:
 -----------------------------------
 docker run -it --rm \
-  --name hexapod_brain \
+  --name hexapod_brain_2 \
   --privileged \
   --network host \
   -v /dev:/dev \

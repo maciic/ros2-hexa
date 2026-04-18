@@ -103,22 +103,30 @@ class HexapodController(Node):
         self.imu_pitch = 0.0
         
         # IMU KALIBRÁCIÓ ÉS BEÁLLÍTÁSOK
-        # A kompenzáció "memóriája" (Integrátor)
-        self.leveling_roll_memory = 0.0
-        self.leveling_pitch_memory = 0.0
+        # Memória helyett mostantól csak simítjuk (EMA filter) az aktuális célpozíciót
+        self.leveling_roll_smoothed = 0.0
+        self.leveling_pitch_smoothed = 0.0
         
-        # Milyen gyorsan reagáljon a dőlésre? (Kisebb érték = finomabb, de lassabb szintezés)
-        self.ki_leveling = 0.05
+        # Milyen erősen reagáljon a dőlésre? (1.0 = 100% kompenzáció, 0.5 = 50%)
+        # Kezdd 0.8-cal, ha túllő (oszcillál), vedd le 0.6-ra!
+        self.kp_leveling = 0.8
+        
+        # Milyen gyors legyen a simítás? (1.0 = azonnali rántás, 0.1 = lágy úsztatás)
+        self.alpha_leveling = 0.2
         
         # 1. TENGELY INVERZIÓ: Ha valamelyik tengelyen ráhajt a dőlésre korrigálás helyett, 
         # írd át 1.0-ról -1.0-ra!
-        self.leveling_roll_dir = 1.0  
-        self.leveling_pitch_dir = 1.0 
+        self.leveling_roll_dir = -1.0  
+        self.leveling_pitch_dir = -1.0 
         
         # 2. SZENZOR OFFSZET: Ha egyenes asztalon is elcsavarja magát, 
         # itt megadhatod a szenzor alap fizikai tévedését radiánban.
         self.imu_roll_offset = -0.0349
         self.imu_pitch_offset = 0.0
+        
+        # --- ÚJ: BEKAPCSOLÁSI KÉSLELTETÉS ---
+        self.imu_warmup_time = 3.0 # 3 másodperc türelem
+        self.robot_start_time = time.time()
         
         # Lábvégek (mancsok) publikálása a Foxglove 3D-hez
         self.foot_tips_pub = self.create_publisher(Marker, 'debug/foot_tips', 10)
@@ -246,8 +254,19 @@ class HexapodController(Node):
         dt = 1.0 / 50.0  # Mivel 50Hz-en fut a timer
         
         base_h = self.get_parameter('gait_base_height').value
+        base_step_h = self.get_parameter('gait_step_height').value
+        
+        # Kiszámoljuk az eltolást (current_vel['z'] -1.0 és 1.0 között mozog)
+        # A testen 40mm-t emelünk/süllyesztünk max.
         z_offset_mm = self.current_vel['z'] * 40.0 
         self.gait.params['base_height'] = base_h + z_offset_mm
+        
+        # --- ÚJ: A lépésmagasság követi a testmagasságot ---
+        # Ha a testet emeljük (Z > 0), a lépést is emeljük (pl. max +40mm-rel)
+        # Ha süllyesztjük, a lépés is kisebb lesz.
+        # A max(10.0, ...) biztosítja, hogy ne legyen 0 vagy negatív a lépés, különben megbotlik.
+        step_offset_mm = self.current_vel['z'] * 40.0
+        self.gait.params['step_height'] = max(20.0, base_step_h - step_offset_mm)
         
         # Szétszedjük a parancsot
         state_parts = self.robot_state_str.split('_', 1)
@@ -260,12 +279,17 @@ class HexapodController(Node):
 
         if main_state == "WALK":
             
-            # FÁZIS NULLÁZÁS INDULÁSKOR
+            # ÚJ: FÁZIS KÖZÉPRE IGAZÍTÁSA INDULÁSKOR (A hátrafelé rántás ellen)
             if self.gait.current_state != "WALK":
-                self.virtual_walk_time = 0.0 
+                self.gait.gait_mode = sub_state if sub_state else "TRIPOD"
+                
+                # Lekérjük az aktuális járásmód talaj-arányát
+                push_fraction, _ = self.gait._get_gait_profile()
+                
+                # Beállítjuk az időt úgy, hogy az alap fázis pontosan a húzás közepén (0.5) induljon!
+                self.virtual_walk_time = (push_fraction / 2.0) / self.gait.params['freq']
                 
             self.gait.current_state = "WALK"
-            self.gait.gait_mode = sub_state if sub_state else "TRIPOD"
             self.gait.active_animation = None
             
             if mag > 0.01:
@@ -289,32 +313,43 @@ class HexapodController(Node):
         self.body_rpy, self.breathe_z, self.anim_leg_offsets = self.gait.get_body_pose(t)
 
         if self.gait.current_state != "ANIMATION":
-            # 1. Kiszámoljuk a nyers hibát (Az esetleges ferde beszerelést is kivonjuk)
-            raw_error_roll = 0.0 - (self.imu_roll - self.imu_roll_offset)
-            raw_error_pitch = 0.0 - (self.imu_pitch - self.imu_pitch_offset)
+            now = time.time()
             
-            # 2. Irányok alkalmazása (A pozitív visszacsatolás elkerülése végett)
-            error_roll = raw_error_roll * self.leveling_roll_dir
-            error_pitch = raw_error_pitch * self.leveling_pitch_dir
-            
-            # 3. HOLTSÁV (Deadband): +/- 2 fokon belül (0.034 rad) nem csinál semmit.
-            # Ez megakadályozza, hogy a robot "remegjen" egyenes talajon.
-            deadband = math.radians(2.0)
-            if abs(error_roll) < deadband: error_roll = 0.0
-            if abs(error_pitch) < deadband: error_pitch = 0.0
+            # --- 0. BIZTONSÁGI VÁRAKOZÁS ---
+            # Várjuk meg, amíg a Madgwick szűrő magához tér a bekapcsolás után!
+            if (now - self.robot_start_time) < self.imu_warmup_time:
+                # Ezalatt az idő alatt a robot ne kompenzáljon semmit.
+                pass 
+            else:
+                # 1. Kiszámoljuk a nyers hibát
+                raw_error_roll = 0.0 - (self.imu_roll - self.imu_roll_offset)
+                raw_error_pitch = 0.0 - (self.imu_pitch - self.imu_pitch_offset)
+                
+                # 2. Irányok alkalmazása
+                error_roll = raw_error_roll * self.leveling_roll_dir
+                error_pitch = raw_error_pitch * self.leveling_pitch_dir
+                
+                # 3. HOLTSÁV (Deadband): +/- 1.5 fokon belül (0.026 rad) nem csinál semmit.
+                deadband = math.radians(1.5)
+                if abs(error_roll) < deadband: error_roll = 0.0
+                if abs(error_pitch) < deadband: error_pitch = 0.0
 
-            # 4. INTEGRÁLÁS: Hozzáadjuk a hibát a memóriához
-            self.leveling_roll_memory -= (error_roll * self.ki_leveling)
-            self.leveling_pitch_memory -= (error_pitch * self.ki_leveling)
-            
-            # 5. BIZTONSÁGI KORLÁT (Clamping): Max 20 fok
-            max_comp = math.radians(20.0) 
-            self.leveling_roll_memory = max(-max_comp, min(max_comp, self.leveling_roll_memory))
-            self.leveling_pitch_memory = max(-max_comp, min(max_comp, self.leveling_pitch_memory))
-            
-            # 6. ALKALMAZÁS A TESTRE
-            self.body_rpy['roll'] += self.leveling_roll_memory
-            self.body_rpy['pitch'] += self.leveling_pitch_memory
+                # 4. PROPORCIONÁLIS SZABÁLYOZÁS (Azonnali reakció!)
+                target_comp_roll = error_roll * self.kp_leveling
+                target_comp_pitch = error_pitch * self.kp_leveling
+                
+                # 5. BIZTONSÁGI KORLÁT (Clamping): Max 20 fok
+                max_comp = math.radians(20.0) 
+                target_comp_roll = max(-max_comp, min(max_comp, target_comp_roll))
+                target_comp_pitch = max(-max_comp, min(max_comp, target_comp_pitch))
+
+                # 6. SIMÍTÁS (EMA Filter) - Hogy ne rángasson agresszívan
+                self.leveling_roll_smoothed = (1.0 - self.alpha_leveling) * self.leveling_roll_smoothed + (self.alpha_leveling * target_comp_roll)
+                self.leveling_pitch_smoothed = (1.0 - self.alpha_leveling) * self.leveling_pitch_smoothed + (self.alpha_leveling * target_comp_pitch)
+                
+                # 7. ALKALMAZÁS A TESTRE
+                self.body_rpy['roll'] += self.leveling_roll_smoothed
+                self.body_rpy['pitch'] += self.leveling_pitch_smoothed
 
         # --- 3. ODOMETRIA ÉS TF HÍVÁSA AZ ÚJ MODULBÓL ---
         is_walking = (self.gait.current_state == "WALK")

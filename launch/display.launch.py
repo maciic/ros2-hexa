@@ -210,11 +210,11 @@ def generate_launch_description():
                 # A decimation-t KIVETTÜNK, mert az alap kép már kicsi!
                 
                 {'Vis/CorType': '1'},          
-                {'Vis/MaxFeatures': '150'},    # <--- ÚJ: 300 helyett 150 pont. Bőven elég a kis képen, és felezi a matekot!
+                {'Vis/MaxFeatures': '200'},    # <--- ÚJ: 300 helyett 150 pont. Bőven elég a kis képen, és felezi a matekot!
                 {'Vis/CorGuessWinSize': '20'}, # <--- ÚJ: Kisebb képen a pixelek fizikailag kevesebbet ugranak, így a keresési területet is a felére vettük!
                 {'Odom/Strategy': '0'},
                 # --- ÚJ: BERAGADÁS ELLENI VÉDELEM ---
-                {'Odom/ResetCountdown': '1'},  # Ha 1 frame-ig elveszett, azonnal nullázza magát és újraindul!
+                {'Odom/ResetCountdown': '5'},  # Ha 1 frame-ig elveszett, azonnal nullázza magát és újraindul!
                 {'Odom/KeyFrameThr': '0.5'}    # Gyakrabban frissíti a referenciaképet (alapból 0.3), így nehezebben veszíti el a fonalat.
             ],
             remappings=[
@@ -246,15 +246,21 @@ def generate_launch_description():
                 {'Grid/RangeMax': '4.0'},            
                 {'Grid/CellSize': '0.05'},           
                 {'Cloud/NoiseFilteringRadius': '0.1'}, 
-                {'Cloud/NoiseFilteringMinNeighbors': '5'},    
                 
                 # <--- A SZAGGATÁS MEGSZÜNTETÉSE (A NAGYAGY LENYUGTATÁSA) ---
                 {'Rtabmap/DetectionRate': '1'},   # <--- 20-ról 1-re! Csak másodpercenként 1x frissíti a térképet.
                 {'RGBD/LinearUpdate': '0.1'},     # <--- 0.01-ről 0.1-re! Csak 10 centinként rak le új csomópontot (Node).
                 {'RGBD/AngularUpdate': '0.1'},    # <--- 0.01-ről 0.1-re! Csak durva fordulásoknál optimalizál.
                 
-                {'Grid/3D': 'False'},               
-                {'Grid/RayTracing': 'False'},       
+                # ÚJ PARAMÉTEREK A VÖRÖS TENGER ELLEN
+                {'Grid/NormalsSegmentation': 'true'}, # Normálvektorok (dőlésszögek) alapján keresse a síkot
+                {'Grid/MaxGroundAngle': '0.785'},     # ~45 fokos dőlésig mindent padlónak tekint! (AI zaj ellensúlyozása)
+                {'Grid/MaxGroundHeight': '0.1'},      # A robot testközepétől számítva 10 centi magasságig padló
+                {'Grid/MaxObstacleHeight': '1.0'},    # A feje feletti dolgokat ne rakja be akadálynak
+                {'Grid/NoiseFilteringMinNeighbors': '10'}, # A kósza lebegő piros pöttyök (zaj) eltüntetése
+                
+                {'Grid/3D': 'True'},               
+                {'Grid/RayTracing': 'True'},       
                 {'Reg/Force3DoF': 'true'}
                 
                 # Kivettük a 'Vis/...' paramétereket innét, mert azoknak az Odometriában a helyük, itt csak zavarták a gépet.

@@ -13,9 +13,9 @@ except ImportError:
 class IMUNode(Node):
     def __init__(self):
         super().__init__('imu_node')
-        
+
         self.publisher_ = self.create_publisher(Imu, 'imu/data_raw', 10)
-        
+
         # 50 Hz-es frissítés (0.02 másodperc) - Gyorsabb is lehet, de a teszthez ez tökéletes
         self.timer = self.create_timer(0.02, self.timer_callback)
 
@@ -26,16 +26,16 @@ class IMUNode(Node):
         if self.hardware_available:
             try:
                 self.bus = SMBus(self.I2C_BUS)
-                
+
                 # --- MPU6050 FELÉBRESZTÉSE ---
                 # A 0x6B (PWR_MGMT_1) regiszterbe 0-t írunk, hogy kikapcsoljuk az alvó módot
                 self.bus.write_byte_data(self.MPU_ADDR, 0x6B, 0x00)
                 time.sleep(0.1)
                 # --- ÚJ: HARDVERES ZAJSZŰRŐ BEKAPCSOLÁSA (DLPF) ---
-                # A 0x1A regiszterbe 0x05-öt írunk. Ez egy 10Hz-es fizikai szűrő, 
+                # A 0x1A regiszterbe 0x05-öt írunk. Ez egy 10Hz-es fizikai szűrő,
                 # ami levágja a motorok és a környezet apró magasfrekvenciás remegéseit!
-                self.bus.write_byte_data(self.MPU_ADDR, 0x1A, 0x05)
-                
+                self.bus.write_byte_data(self.MPU_ADDR, 0x1A, 0x04)
+
                 self.get_logger().info("✅ GY-521 (MPU6050) IMU sikeresen felébresztve a 0x68 címen!")
             except Exception as e:
                 self.get_logger().error(f"❌ I2C Inicializálási hiba az IMU-nál: {e}")
@@ -47,10 +47,10 @@ class IMUNode(Node):
         """ Beolvas 2 byte-ot a megadott regiszterből és átalakítja előjeles (signed) 16-bites számmá """
         high = self.bus.read_byte_data(self.MPU_ADDR, addr)
         low = self.bus.read_byte_data(self.MPU_ADDR, addr+1)
-        
+
         # Bitművelet: Összefűzzük a magas és alacsony byte-okat
         value = ((high << 8) | low)
-        
+
         # Ha a szám negatív (2-es komplemens a 16-bites rendszerben)
         if value > 32768:
             value = value - 65536
@@ -65,13 +65,13 @@ class IMUNode(Node):
             acc_x = self.read_raw_data(0x3B)
             acc_y = self.read_raw_data(0x3D)
             acc_z = self.read_raw_data(0x3F)
-            
+
             gyro_x = self.read_raw_data(0x43)
             gyro_y = self.read_raw_data(0x45)
             gyro_z = self.read_raw_data(0x47)
 
             # 2. KONVERZIÓ FIZIKAI MÉRTÉKEGYSÉGEKRE
-            # Gyorsulás: alapértelmezett ±2g méréshatárnál a szorzó 16384. 
+            # Gyorsulás: alapértelmezett ±2g méréshatárnál a szorzó 16384.
             # Ezt be kell szorozni a gravitációs állandóval (9.80665), hogy m/s^2 legyen.
             GRAVITY = 9.80665
             ax = (acc_x / 16384.0) * GRAVITY
@@ -83,14 +83,6 @@ class IMUNode(Node):
             gx = math.radians(gyro_x / 131.0)
             gy = math.radians(gyro_y / 131.0)
             gz = math.radians(gyro_z / 131.0)
-
-            # --- ÚJ: SZOFTVERES KÜSZÖB (DEADBAND) ---
-            # Ha a forgási sebesség kisebb, mint kb. 1.7 fok/másodperc (0.03 rad/s),
-            # akkor kerekítsük le nullára, hogy ne remegjen a szimuláció a zajtól!
-            deadband = 0.06
-            if abs(gx) < deadband: gx = 0.0
-            if abs(gy) < deadband: gy = 0.0
-            if abs(gz) < deadband: gz = 0.0
 
             # 3. ROS2 ÜZENET ÖSSZEÁLLÍTÁSA
             msg = Imu()
@@ -105,11 +97,11 @@ class IMUNode(Node):
             msg.angular_velocity.y = gy
             msg.angular_velocity.z = gz
 
-            # Mivel ez "raw" node, a dőlésszöget (orientation) nem mi számoljuk ki, 
-            # azt majd a Kalman-szűrő csinálja. Ezért a kovariancia első elemét -1-re tesszük, 
+            # Mivel ez "raw" node, a dőlésszöget (orientation) nem mi számoljuk ki,
+            # azt majd a Kalman-szűrő csinálja. Ezért a kovariancia első elemét -1-re tesszük,
             # jelezve a ROS-nak, hogy hagyja figyelmen kívül.
-            msg.orientation_covariance[0] = -1.0 
-            
+            msg.orientation_covariance[0] = -1.0
+
             # A gyorsulásmérő varianciája (Mennyire bízunk benne? Nagyobb szám = jobban kiszűri a zajt, de lassabb)
             msg.linear_acceleration_covariance[0] = 0.04  # X
             msg.linear_acceleration_covariance[4] = 0.04  # Y

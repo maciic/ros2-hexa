@@ -5,9 +5,9 @@ class AIStateMachine:
     def __init__(self):
         # --- KÖVETÉSI BEÁLLÍTÁSOK ---
         self.target_hip_width = 80 
-        self.kp_linear = 0.005
-        self.kp_yaw = 0.002
-        self.center_x = 320 
+        self.kp_linear = 0.015
+        self.kp_yaw = 0.008
+        self.center_x = 160 
         
         # --- ROBOTIKAI MEMÓRIA ---
         self.last_anim_sent = "NONE"
@@ -46,7 +46,7 @@ class AIStateMachine:
         if not is_remembered:
             self.active_gesture = "STOP"
             if current_mode == "SENTRY":
-                cmd_vel.angular.z = 0.2  
+                cmd_vel.angular.z = 0.5
                 anim_request = "STOP"    
             else:
                 anim_request = "STOP"    
@@ -78,8 +78,9 @@ class AIStateMachine:
                 if abs(error_linear) < 15: error_linear = 0.0
                 if abs(error_yaw) < 30: error_yaw = 0.0
 
-                cmd_vel.linear.x = max(min(error_linear * self.kp_linear, 0.3), -0.3)
-                cmd_vel.angular.z = max(min(error_yaw * self.kp_yaw, 0.4), -0.4)
+                # Limit felemelve 0.8-ra (80%-os max sebesség és fordulás)
+                cmd_vel.linear.x = max(min(error_linear * self.kp_linear, 0.8), -0.8)
+                cmd_vel.angular.z = max(min(error_yaw * self.kp_yaw, 0.8), -0.8)
             else:
                 anim_request = "STOP"
 

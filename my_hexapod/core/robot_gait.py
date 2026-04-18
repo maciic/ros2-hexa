@@ -105,8 +105,12 @@ class HexapodGait:
             walk_amp = (self.params['step_len'] / 2.0) * dir_x * length_factor * startup_fade
             strafe_amp = (self.params['step_len'] / 2.0) * dir_y * length_factor * startup_fade
             turn_amp = (self.params['step_len'] / 2.0) * dir_yaw * length_factor * startup_fade
+            
+            # ÚJ: A lábemelést is beúsztatjuk, hogy ne ugorjon fel azonnal!
+            current_step_height = self.params['step_height'] * startup_fade
         else:
             walk_amp, strafe_amp, turn_amp = 0.0, 0.0, 0.0
+            current_step_height = 0.0 # ÚJ
 
         # --- ÚJ: Itt is a beépített profilból kérjük le a push_fraction-t! ---
         push_fraction, _ = self._get_gait_profile()
@@ -123,13 +127,14 @@ class HexapodGait:
         else:
             t_air = (t - push_fraction) / (1.0 - push_fraction)
             p0_walk, p0_strafe, p0_turn, p0_z = -walk_amp, -strafe_amp, -turn_amp, 0.0
-            p1_walk, p1_strafe, p1_turn, p1_z = -walk_amp, -strafe_amp, -turn_amp, self.params['step_height']
+            # ITT CSERÉLD LE:
+            p1_walk, p1_strafe, p1_turn, p1_z = -walk_amp, -strafe_amp, -turn_amp, current_step_height
             
             overshoot = 1.2
             p2_walk = walk_amp * overshoot
             p2_strafe = strafe_amp * overshoot
             p2_turn = turn_amp * overshoot
-            p2_z = self.params['step_height'] * 0.8 
+            p2_z = current_step_height * 0.8 
             
             p3_walk, p3_strafe, p3_turn, p3_z = walk_amp, strafe_amp, turn_amp, 0.0
 
